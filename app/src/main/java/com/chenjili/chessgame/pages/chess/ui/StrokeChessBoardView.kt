@@ -2,6 +2,7 @@ package com.chenjili.chessgame.pages.chess.ui
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
@@ -37,15 +38,19 @@ class StrokeChessBoardView @JvmOverloads constructor(
 
     private var playerColor: PlayerColor = PlayerColor.White
 
+    // 离屏缓存
+    private var cacheBitmap: Bitmap? = null
+    private var cacheCanvas: Canvas? = null
+    private var cacheValid: Boolean = false
+
     init {
-        // 可按需从 attrs 读取自定义属性（这里用简单默认色）
         borderPaint.strokeWidth = borderWidthPx
     }
 
     fun setCellColors(light: Int, dark: Int) {
         lightColor = light
         darkColor = dark
-        invalidate()
+        invalidateCache()
     }
 
     fun setBorder(color: Int, widthDp: Float) {
@@ -53,7 +58,7 @@ class StrokeChessBoardView @JvmOverloads constructor(
         borderWidthPx = widthDp * resources.displayMetrics.density
         borderPaint.color = borderColor
         borderPaint.strokeWidth = borderWidthPx
-        invalidate()
+        invalidateCache()
     }
 
     fun setPerCellDuration(ms: Long) {
@@ -62,12 +67,18 @@ class StrokeChessBoardView @JvmOverloads constructor(
 
     fun setPlayerColor(color: PlayerColor) {
         playerColor = color
+        invalidateCache()
+    }
+
+    private fun invalidateCache() {
+        cacheValid = false
         invalidate()
     }
 
     fun startDraw() {
         animator?.cancel()
         drawnCellsCount = 0
+        invalidateCache() // 动画时不要使用静态缓存
         val total = 8 * 8
         animator = ValueAnimator.ofInt(0, total).apply {
             duration = perCellDurationMs * total
@@ -82,15 +93,20 @@ class StrokeChessBoardView @JvmOverloads constructor(
     fun stopDraw() {
         animator?.cancel()
         animator = null
+        // 动画结束后可以重建缓存以便后续绘制快速
+        invalidateCache()
+        // optional: buildCache()  // 延迟到下次 onDraw 构建
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         animator?.cancel()
+        cacheBitmap?.recycle()
+        cacheBitmap = null
+        cacheCanvas = null
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // 强制正方形，取较小边
         val w = MeasureSpec.getSize(widthMeasureSpec)
         val h = MeasureSpec.getSize(heightMeasureSpec)
         val size = min(w, h)
@@ -110,18 +126,73 @@ class StrokeChessBoardView @JvmOverloads constructor(
                 cellRects.add(rect)
             }
         }
+
+        // 重建或释放缓存 Bitmap
+        if (w > 0 && h > 0) {
+            cacheBitmap?.recycle()
+            cacheBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            cacheCanvas = Canvas(cacheBitmap!!)
+            cacheValid = false
+        } else {
+            cacheBitmap?.recycle()
+            cacheBitmap = null
+            cacheCanvas = null
+            cacheValid = false
+        }
+    }
+
+    // 将完整棋盘绘制到 cacheCanvas
+    private fun buildCache() {
+        val cb = cacheCanvas ?: return
+        cb.drawColor(0) // 清空
+        // 考虑 playerColor 旋转
+        if (playerColor == PlayerColor.Black) {
+            cb.save()
+            cb.rotate(180f, width / 2f, height / 2f)
+        }
+
+        // 绘制全部格子
+        for (i in 0 until cellRects.size) {
+            val rect = cellRects[i]
+            val row = i / 8
+            val col = i % 8
+            val isLight = (row + col) % 2 == 0
+            paint.style = Paint.Style.FILL
+            paint.color = if (isLight) lightColor else darkColor
+            cb.drawRect(rect, paint)
+        }
+
+        // 边框
+        borderPaint.style = Paint.Style.STROKE
+        borderPaint.color = borderColor
+        cb.drawRect(0f, 0f, width.toFloat(), height.toFloat(), borderPaint)
+
+        if (playerColor == PlayerColor.Black) {
+            cb.restore()
+        }
+        cacheValid = true
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        // 如果是黑方视角，需要先旋转画布 180 度（以视图中心为轴）以翻转棋盘位置，但单格绘制方向保持不变
+        // 如果没有动画并且缓存可用，直接绘制缓存 Bitmap（避免逐格绘制）
+        if (animator == null) {
+            if (!cacheValid) {
+                buildCache()
+            }
+            cacheBitmap?.let {
+                canvas.drawBitmap(it, 0f, 0f, null)
+            }
+            return
+        }
+
+        // 动画进行中：按原逻辑逐格绘制（缓存已被标记为无效）
         if (playerColor == PlayerColor.Black) {
             canvas.save()
             canvas.rotate(180f, width / 2f, height / 2f)
         }
 
-        // 绘制已到达的格子（按行主序：row 0..7, col 0..7）
         val totalToDraw = drawnCellsCount.coerceIn(0, cellRects.size)
         for (i in 0 until totalToDraw) {
             val rect = cellRects[i]
@@ -133,13 +204,10 @@ class StrokeChessBoardView @JvmOverloads constructor(
             canvas.drawRect(rect, paint)
         }
 
-        // 如果动画尚未完成，仍需绘制已完成之前的格子边框/占位为透明时不绘制
-        // 绘制全部格子边框（不随动画显示）
         borderPaint.style = Paint.Style.STROKE
         borderPaint.color = borderColor
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), borderPaint)
 
-        // 恢复旋转（如有）
         if (playerColor == PlayerColor.Black) {
             canvas.restore()
         }

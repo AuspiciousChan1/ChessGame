@@ -64,7 +64,7 @@ fun ChessScreen(
                             }
                         }
                 ) {
-                    // 棋盘背景图
+//                    // 棋盘背景图
 //                    Image(
 //                        painter = painterResource(id = R.drawable.chess_board_default),
 //                        contentDescription = "Chess board",
