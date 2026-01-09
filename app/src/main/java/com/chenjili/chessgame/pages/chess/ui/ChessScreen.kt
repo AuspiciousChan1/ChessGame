@@ -3,6 +3,7 @@ package com.chenjili.chessgame.pages.chess.ui
 
 import android.app.Application
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +35,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import java.util.ArrayList
+import kotlin.div
+import kotlin.text.toInt
 
 @Composable
 fun ChessScreen(
@@ -40,7 +45,8 @@ fun ChessScreen(
     playerColor: PlayerColor = PlayerColor.White,
     pieces: List<ChessPieceDisplay> = remember { ArrayList() },
     onBoardLayoutChanged: (x: Dp, y: Dp, width: Dp, height: Dp) -> Unit = { _, _, _, _ -> },
-    onPlayerColorChanged: (PlayerColor) -> Unit = { _ -> }
+    onPlayerColorChanged: (PlayerColor) -> Unit = { _ -> },
+    onBoardCellClicked: (column: Int, row: Int) -> Unit = { _, _ -> }
 ) {
     ChessGameTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -132,6 +138,37 @@ fun ChessScreen(
                                 )
                             }
                         }
+
+                        // 2) 透明点击层（放在最上面，覆盖整个棋盘）
+                        val boardSizePx = with(LocalDensity.current) { squareSize.toPx() }
+                        val cellSizePx = boardSizePx / 8f
+
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .pointerInput(playerColor, boardSizePx) {
+                                    detectTapGestures { tap: Offset ->
+                                        // tap 是相对该 Box（棋盘左上角）的坐标，单位 px
+                                        val x = tap.x.coerceIn(0f, boardSizePx - 0.001f)
+                                        val y = tap.y.coerceIn(0f, boardSizePx - 0.001f)
+
+                                        val colFromLeft = (x / cellSizePx).toInt().coerceIn(0, 7)
+                                        val rowFromTop = (y / cellSizePx).toInt().coerceIn(0, 7)
+
+                                        // 你的绘制：y = cell * (7 - row)，所以 row = 7 - rowFromTop
+                                        var column = colFromLeft
+                                        var row = 7 - rowFromTop
+
+                                        // 若玩家视角为黑方，你对棋盘做了 rotate(180)，坐标也需要镜像
+                                        if (playerColor == PlayerColor.Black) {
+                                            column = 7 - column
+                                            row = 7 - row
+                                        }
+
+                                        onBoardCellClicked(column, row)
+                                    }
+                                }
+                        )
                     }
                     Row(
                         modifier = Modifier

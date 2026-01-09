@@ -74,4 +74,9 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             piece.column = 7 - piece.column
         }
     }
+
+    fun onBoardCellClicked(column: Int, row: Int) {
+        // 处理点击事件，例如打印点击的格子位置
+        println("Cell clicked at row: $row, column: $column")
+    }
 }

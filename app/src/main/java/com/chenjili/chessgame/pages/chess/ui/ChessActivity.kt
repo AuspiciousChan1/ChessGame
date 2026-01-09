@@ -40,7 +40,7 @@ class ChessActivity : ComponentActivity() {
             ChessScreen(application=this@ChessActivity.application, playerColor=color, pieces = pieces,
                 onBoardLayoutChanged = { x: Dp, y: Dp, width: Dp, height: Dp ->
                     Log.i(TAG, "x=$x, y=$y, width=$width, height=$height")
-                }, onPlayerColorChanged = viewModel::onPlayerColorChanged
+                }, onPlayerColorChanged = viewModel::onPlayerColorChanged,onBoardCellClicked=viewModel::onBoardCellClicked
             )
         }
     }
