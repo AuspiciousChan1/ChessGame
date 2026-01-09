@@ -3,8 +3,11 @@ package com.chenjili.chessgame.pages.chess.ui
 
 import android.app.Application
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -52,31 +55,36 @@ fun ChessScreen(
                 val density = LocalDensity.current
                 val context = LocalContext.current
 
-                Box(
-                    modifier = Modifier
-                        .size(squareSize)
-                        .align(Alignment.Center)
-                        .onGloballyPositioned { coordinates ->
-                            val topLeft = coordinates.positionInWindow()
-                            val sizePx = coordinates.size
-                            with(density) {
-                                val xDp = topLeft.x.toDp()
-                                val yDp = topLeft.y.toDp()
-                                val widthDp = sizePx.width.toDp()
-                                val heightDp = sizePx.height.toDp()
-                                onBoardLayoutChanged(xDp, yDp, widthDp, heightDp)
-                            }
-                        }
+                Column(modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingDp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    // 棋盘背景图
-                    Image(
-                        painter = painterResource(id = R.drawable.chess_board_default),
-                        contentDescription = "Chess board",
+                    Box(
                         modifier = Modifier
                             .size(squareSize)
-                            .align(Alignment.TopStart)
-                            .rotate(if (playerColor == PlayerColor.Black) 180f else 0f)
-                    )
+                            .onGloballyPositioned { coordinates ->
+                                val topLeft = coordinates.positionInWindow()
+                                val sizePx = coordinates.size
+                                with(density) {
+                                    val xDp = topLeft.x.toDp()
+                                    val yDp = topLeft.y.toDp()
+                                    val widthDp = sizePx.width.toDp()
+                                    val heightDp = sizePx.height.toDp()
+                                    onBoardLayoutChanged(xDp, yDp, widthDp, heightDp)
+                                }
+                            }
+                    ) {
+                        // 棋盘背景图
+                        Image(
+                            painter = painterResource(id = R.drawable.chess_board_default),
+                            contentDescription = "Chess board",
+                            modifier = Modifier
+                                .size(squareSize)
+                                .align(Alignment.TopStart)
+                                .rotate(if (playerColor == PlayerColor.Black) 180f else 0f)
+                        )
 //                    // 使用自定义 View 作为棋盘背景
 //                    AndroidView(
 //                        modifier = Modifier
@@ -92,36 +100,54 @@ fun ChessScreen(
 //                            view.setPlayerColor(playerColor)
 //                        }
 //                    )
-                    // 计算格子与棋子尺寸
-                    val cellDp = squareSize / 8f
-                    val pieceDp = cellDp * 0.8f
-                    val pieceOffsetInner = (cellDp - pieceDp) / 2f
+                        // 计算格子与棋子尺寸
+                        val cellDp = squareSize / 8f
+                        val pieceDp = cellDp * 0.8f
+                        val pieceOffsetInner = (cellDp - pieceDp) / 2f
 
-                    pieces.forEach { piece ->
-                        val x = (cellDp * piece.column) + pieceOffsetInner
-                        val y = (cellDp * (7 - piece.row)) + pieceOffsetInner
+                        pieces.forEach { piece ->
+                            val x = (cellDp * piece.column) + pieceOffsetInner
+                            val y = (cellDp * (7 - piece.row)) + pieceOffsetInner
 
-                        val typeName = when (piece.type) {
-                            PieceType.KING -> "king"
-                            PieceType.QUEEN -> "queen"
-                            PieceType.ROOK -> "rook"
-                            PieceType.BISHOP -> "bishop"
-                            PieceType.KNIGHT -> "knight"
-                            PieceType.PAWN -> "pawn"
+                            val typeName = when (piece.type) {
+                                PieceType.KING -> "king"
+                                PieceType.QUEEN -> "queen"
+                                PieceType.ROOK -> "rook"
+                                PieceType.BISHOP -> "bishop"
+                                PieceType.KNIGHT -> "knight"
+                                PieceType.PAWN -> "pawn"
+                            }
+                            val colorName = if (piece.color == PlayerColor.White) "white" else "black"
+                            val resName = "chess_piece_${colorName}_$typeName"
+                            val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
+
+                            if (resId != 0) {
+                                Image(
+                                    painter = painterResource(id = resId),
+                                    contentDescription = "${colorName}_$typeName",
+                                    modifier = Modifier
+                                        .size(pieceDp)
+                                        .align(Alignment.TopStart)
+                                        .offset(x = x, y = y)
+                                )
+                            }
                         }
-                        val colorName = if (piece.color == PlayerColor.White) "white" else "black"
-                        val resName = "chess_piece_${colorName}_$typeName"
-                        val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
-
-                        if (resId != 0) {
-                            Image(
-                                painter = painterResource(id = resId),
-                                contentDescription = "${colorName}_$typeName",
-                                modifier = Modifier
-                                    .size(pieceDp)
-                                    .align(Alignment.TopStart)
-                                    .offset(x = x, y = y)
-                            )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .size(squareSize, 48.dp)
+                            .padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                val newColor =
+                                    if (playerColor == PlayerColor.White) PlayerColor.Black else PlayerColor.White
+                                onPlayerColorChanged(newColor)
+                            }
+                        ) {
+                            Text(text = stringResource(id = R.string.switch_side))
                         }
                     }
                 }
