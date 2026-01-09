@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -15,8 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
+import kotlin.getValue
 
 class ChessActivity : ComponentActivity() {
+    private val viewModel: ChessViewModel by viewModels()
     companion object {
         const val TAG = "ChessActivity"
         fun startActivity(activity: Activity, map: Map<String, String>? = null) {
@@ -32,12 +35,13 @@ class ChessActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val viewModel = ChessViewModel(this.application)
             val pieces by viewModel.pieces.collectAsState()
-            val color = PlayerColor.Black
-            ChessScreen(application=this@ChessActivity.application, playerColor=color, onBoardLayoutChanged = { x: Dp, y: Dp, width: Dp, height: Dp ->
-                Log.i(TAG, "x=$x, y=$y, width=$width, height=$height")
-            })
+            val color by viewModel.color.collectAsState()
+            ChessScreen(application=this@ChessActivity.application, playerColor=color, pieces = pieces,
+                onBoardLayoutChanged = { x: Dp, y: Dp, width: Dp, height: Dp ->
+                    Log.i(TAG, "x=$x, y=$y, width=$width, height=$height")
+                }, onPlayerColorChanged = viewModel::onPlayerColorChanged
+            )
         }
     }
 }

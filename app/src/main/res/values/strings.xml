@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">ChessGame</string>
     <string name="title_activity_chess">ChessActivity</string>
+    <string name="switch_side">switch side</string>
 </resources>
