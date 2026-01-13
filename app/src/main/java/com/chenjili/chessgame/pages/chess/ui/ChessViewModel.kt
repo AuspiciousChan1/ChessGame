@@ -20,8 +20,8 @@ enum class PieceType{
 data class ChessPieceDisplay(
     val type: PieceType,
     val color: PlayerColor,
-    var column: Int, // 0..7 白方对应a-h；黑方对应h-a
-    var row: Int  // 0..7 白方对应1-8；黑方对应8-1
+    val column: Int, // 0..7 白方对应a-h；黑方对应h-a
+    val row: Int  // 0..7 白方对应1-8；黑方对应8-1
 )
 
 // MVI: Intent - 表示用户的所有可能操作
@@ -87,16 +87,16 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun handlePlayerColorChanged(newColor: PlayerColor) {
-        val currentPieces = _state.value.pieces.toMutableList()
-        
-        for (piece in currentPieces) {
-            piece.row = 7 - piece.row
-            piece.column = 7 - piece.column
+        val updatedPieces = _state.value.pieces.map { piece ->
+            piece.copy(
+                row = 7 - piece.row,
+                column = 7 - piece.column
+            )
         }
         
         _state.value = _state.value.copy(
             playerColor = newColor,
-            pieces = currentPieces
+            pieces = updatedPieces
         )
     }
 
