@@ -20,15 +20,25 @@ enum class PieceType{
 data class ChessPieceDisplay(
     val type: PieceType,
     val color: PlayerColor,
-    var column: Int, // 0..7 白方对应a-h；黑方对应h-a
-    var row: Int  // 0..7 白方对应1-8；黑方对应8-1
+    val column: Int, // 0..7 白方对应a-h；黑方对应h-a
+    val row: Int  // 0..7 白方对应1-8；黑方对应8-1
+)
+
+// MVI: Intent - 表示用户的所有可能操作
+sealed interface ChessIntent {
+    data class PlayerColorChanged(val newColor: PlayerColor) : ChessIntent
+    data class BoardCellClicked(val column: Int, val row: Int) : ChessIntent
+}
+
+// MVI: State - 表示整个UI状态
+data class ChessState(
+    val pieces: List<ChessPieceDisplay> = emptyList(),
+    val playerColor: PlayerColor = PlayerColor.White
 )
 
 class ChessViewModel(application: Application) : AndroidViewModel(application) {
-    private val _pieces = MutableStateFlow<ArrayList<ChessPieceDisplay>>(ArrayList())
-    private val _color = MutableStateFlow<PlayerColor>(PlayerColor.White)
-    val pieces: StateFlow<ArrayList<ChessPieceDisplay>> = _pieces.asStateFlow()
-    val color: StateFlow<PlayerColor> = _color.asStateFlow()
+    private val _state = MutableStateFlow(ChessState())
+    val state: StateFlow<ChessState> = _state.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -61,21 +71,37 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.Black, 6, 7),
                 ChessPieceDisplay(PieceType.ROOK, PlayerColor.Black, 7, 7)
             )
-            _pieces.value = ArrayList(initialPieces)
-            _color.value = PlayerColor.White
+            _state.value = ChessState(
+                pieces = initialPieces,
+                playerColor = PlayerColor.White
+            )
         }
     }
 
-    fun onPlayerColorChanged(newColor: PlayerColor) {
-        _color.value = newColor
-
-        for (piece in _pieces.value) {
-            piece.row = 7 - piece.row
-            piece.column = 7 - piece.column
+    // MVI: 处理Intent的唯一入口
+    fun processIntent(intent: ChessIntent) {
+        when (intent) {
+            is ChessIntent.PlayerColorChanged -> handlePlayerColorChanged(intent.newColor)
+            is ChessIntent.BoardCellClicked -> handleBoardCellClicked(intent.column, intent.row)
         }
     }
 
-    fun onBoardCellClicked(column: Int, row: Int) {
+    private fun handlePlayerColorChanged(newColor: PlayerColor) {
+        val currentState = _state.value
+        val updatedPieces = currentState.pieces.map { piece ->
+            piece.copy(
+                row = 7 - piece.row,
+                column = 7 - piece.column
+            )
+        }
+        
+        _state.value = currentState.copy(
+            playerColor = newColor,
+            pieces = updatedPieces
+        )
+    }
+
+    private fun handleBoardCellClicked(column: Int, row: Int) {
         // 处理点击事件，例如打印点击的格子位置
         println("Cell clicked at row: $row, column: $column")
     }
