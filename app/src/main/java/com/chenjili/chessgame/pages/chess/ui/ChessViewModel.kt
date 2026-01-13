@@ -87,14 +87,15 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun handlePlayerColorChanged(newColor: PlayerColor) {
-        val updatedPieces = _state.value.pieces.map { piece ->
+        val currentState = _state.value
+        val updatedPieces = currentState.pieces.map { piece ->
             piece.copy(
                 row = 7 - piece.row,
                 column = 7 - piece.column
             )
         }
         
-        _state.value = _state.value.copy(
+        _state.value = currentState.copy(
             playerColor = newColor,
             pieces = updatedPieces
         )
