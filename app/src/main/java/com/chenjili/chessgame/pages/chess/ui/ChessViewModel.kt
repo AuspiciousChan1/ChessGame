@@ -18,6 +18,7 @@ enum class PieceType{
 }
 
 data class ChessPieceDisplay(
+    val id: String, // Unique identifier for the piece
     val type: PieceType,
     val color: PlayerColor,
     val column: Int, // 0..7 白方对应a-h；黑方对应h-a
@@ -34,43 +35,52 @@ sealed interface ChessIntent {
 data class ChessState(
     val pieces: List<ChessPieceDisplay> = emptyList(),
     val playerColor: PlayerColor = PlayerColor.White,
-    val selectedCell: Pair<Int, Int>? = null // (column, row) of the selected cell
+    val selectedCell: Pair<Int, Int>? = null, // (column, row) of the selected cell
+    val moveHistory: List<String> = emptyList() // List of move notations
 )
 
 class ChessViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(ChessState())
     val state: StateFlow<ChessState> = _state.asStateFlow()
 
+    // Helper function to convert column/row to chess notation (e.g., 0,0 -> "a1", 1,2 -> "b3")
+    private fun toChessNotation(column: Int, row: Int): String {
+        val files = "abcdefgh"
+        return "${files[column]}${row + 1}"
+    }
+
+    // Helper function to get piece type name in Chinese
+    private fun getPieceTypeName(type: PieceType): String {
+        return when (type) {
+            PieceType.KING -> "王"
+            PieceType.QUEEN -> "后"
+            PieceType.ROOK -> "车"
+            PieceType.BISHOP -> "象"
+            PieceType.KNIGHT -> "马"
+            PieceType.PAWN -> "兵"
+        }
+    }
+
     init {
         viewModelScope.launch {
-            // 初始化棋盘
+            // 初始化棋盘 - 按照需求：从start起，分别是兵、马、象、后、王
             val initialPieces = mutableListOf<ChessPieceDisplay>()
-            // 白方底线 rank = 0
+            // 白方底线 rank = 0: 兵、马、象、后、王
             initialPieces += listOf(
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.White, 0, 0),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.White, 1, 0),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.White, 2, 0),
-                ChessPieceDisplay(PieceType.QUEEN, PlayerColor.White, 3, 0),
-                ChessPieceDisplay(PieceType.KING, PlayerColor.White, 4, 0),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.White, 5, 0),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.White, 6, 0),
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.White, 7, 0)
+                ChessPieceDisplay("w_pawn_0", PieceType.PAWN, PlayerColor.White, 0, 0),
+                ChessPieceDisplay("w_knight_0", PieceType.KNIGHT, PlayerColor.White, 1, 0),
+                ChessPieceDisplay("w_bishop_0", PieceType.BISHOP, PlayerColor.White, 2, 0),
+                ChessPieceDisplay("w_queen_0", PieceType.QUEEN, PlayerColor.White, 3, 0),
+                ChessPieceDisplay("w_king_0", PieceType.KING, PlayerColor.White, 4, 0)
             )
-            // 白兵 rank = 1
-            for (f in 0..7) initialPieces += ChessPieceDisplay(PieceType.PAWN, PlayerColor.White, f, 1)
 
-            // 黑兵 rank = 6
-            for (f in 0..7) initialPieces += ChessPieceDisplay(PieceType.PAWN, PlayerColor.Black, f, 6)
-            // 黑方底线 rank = 7
+            // 黑方底线 rank = 7: 兵、马、象、后、王
             initialPieces += listOf(
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.Black, 0, 7),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.Black, 1, 7),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.Black, 2, 7),
-                ChessPieceDisplay(PieceType.QUEEN, PlayerColor.Black, 3, 7),
-                ChessPieceDisplay(PieceType.KING, PlayerColor.Black, 4, 7),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.Black, 5, 7),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.Black, 6, 7),
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.Black, 7, 7)
+                ChessPieceDisplay("b_pawn_0", PieceType.PAWN, PlayerColor.Black, 0, 7),
+                ChessPieceDisplay("b_knight_0", PieceType.KNIGHT, PlayerColor.Black, 1, 7),
+                ChessPieceDisplay("b_bishop_0", PieceType.BISHOP, PlayerColor.Black, 2, 7),
+                ChessPieceDisplay("b_queen_0", PieceType.QUEEN, PlayerColor.Black, 3, 7),
+                ChessPieceDisplay("b_king_0", PieceType.KING, PlayerColor.Black, 4, 7)
             )
             _state.value = ChessState(
                 pieces = initialPieces,
@@ -138,6 +148,12 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 
                 if (selectedPiece != null) {
+                    // Create move notation
+                    val fromNotation = toChessNotation(selectedCol, selectedRow)
+                    val toNotation = toChessNotation(column, row)
+                    val pieceTypeName = getPieceTypeName(selectedPiece.type)
+                    val moveNotation = "$pieceTypeName$fromNotation-$toNotation"
+                    
                     // Remove piece at destination if exists (capture) and move selected piece
                     val updatedPieces = currentState.pieces.mapNotNull { piece ->
                         when {
@@ -153,7 +169,8 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                     
                     _state.value = currentState.copy(
                         pieces = updatedPieces,
-                        selectedCell = null
+                        selectedCell = null,
+                        moveHistory = currentState.moveHistory + moveNotation
                     )
                 } else {
                     // No piece found at selected cell (shouldn't happen), just deselect

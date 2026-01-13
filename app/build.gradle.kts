@@ -6,14 +6,12 @@ plugins {
 
 android {
     namespace = "com.chenjili.chessgame"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.chenjili.chessgame"
         minSdk = 29
-        targetSdk = 36
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 

@@ -2,6 +2,10 @@
 package com.chenjili.chessgame.pages.chess.ui
 
 import android.app.Application
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -11,14 +15,25 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -31,8 +46,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
@@ -114,9 +131,32 @@ fun ChessScreen(
                         val pieceDp = cellDp * 0.8f
                         val pieceOffsetInner = (cellDp - pieceDp) / 2f
 
+                        // Create a map to track animated positions for each piece
+                        val piecePositions = remember { mutableStateMapOf<String, Animatable<Offset, *>>() }
+
                         state.pieces.forEach { piece ->
-                            val x = (cellDp * piece.column) + pieceOffsetInner
-                            val y = (cellDp * (7 - piece.row)) + pieceOffsetInner
+                            val targetX = (cellDp * piece.column) + pieceOffsetInner
+                            val targetY = (cellDp * (7 - piece.row)) + pieceOffsetInner
+                            val targetOffset = Offset(targetX.value, targetY.value)
+                            
+                            // Use piece ID as the key for animation tracking
+                            val pieceKey = piece.id
+                            
+                            // Get or create animation for this piece position
+                            val animatedOffset = piecePositions.getOrPut(pieceKey) {
+                                Animatable(targetOffset, Offset.VectorConverter)
+                            }
+
+                            // Animate to the target position when it changes
+                            LaunchedEffect(targetOffset) {
+                                animatedOffset.animateTo(
+                                    targetValue = targetOffset,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessLow
+                                    )
+                                )
+                            }
 
                             val typeName = when (piece.type) {
                                 PieceType.KING -> "king"
@@ -131,13 +171,15 @@ fun ChessScreen(
                             val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
 
                             if (resId != 0) {
+                                val currentPosition = animatedOffset.value
                                 Image(
                                     painter = painterResource(id = resId),
                                     contentDescription = "${colorName}_$typeName",
                                     modifier = Modifier
                                         .size(pieceDp)
                                         .align(Alignment.TopStart)
-                                        .offset(x = x, y = y)
+                                        .offset(x = with(density) { currentPosition.x.toDp() }, 
+                                               y = with(density) { currentPosition.y.toDp() })
                                 )
                             }
                         }
@@ -202,6 +244,53 @@ fun ChessScreen(
                             }
                         ) {
                             Text(text = stringResource(id = R.string.switch_side))
+                        }
+                    }
+                    
+                    // Move history area (棋谱区域)
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp)
+                            .height(150.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFF5F5DC)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp)
+                        ) {
+                            Text(
+                                text = "棋谱",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            
+                            val listState = rememberLazyListState()
+                            
+                            // Auto-scroll to the bottom when new moves are added
+                            LaunchedEffect(state.moveHistory.size) {
+                                if (state.moveHistory.isNotEmpty()) {
+                                    listState.animateScrollToItem(state.moveHistory.size - 1)
+                                }
+                            }
+                            
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(state.moveHistory) { move ->
+                                    Text(
+                                        text = move,
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.padding(vertical = 2.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }

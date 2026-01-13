@@ -5,9 +5,7 @@ plugins {
 
 android {
     namespace = "com.chenjili.chess"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 29
