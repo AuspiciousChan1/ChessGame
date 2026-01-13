@@ -1,14 +1,11 @@
 package com.chenjili.chessgame
 
-import android.app.Application
 import com.chenjili.chessgame.pages.chess.ui.ChessIntent
 import com.chenjili.chessgame.pages.chess.ui.ChessViewModel
 import com.chenjili.chessgame.pages.chess.ui.PieceType
 import com.chenjili.chessgame.pages.chess.ui.PlayerColor
 import org.junit.Test
 import org.junit.Assert.*
-import org.junit.Before
-import org.mockito.Mockito.mock
 
 /**
  * Unit tests for ChessViewModel piece selection and movement logic.

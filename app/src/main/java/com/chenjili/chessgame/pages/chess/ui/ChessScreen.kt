@@ -40,6 +40,9 @@ import java.util.ArrayList
 import kotlin.div
 import kotlin.text.toInt
 
+// Constants for UI
+private val SelectedCellOverlayColor = Color(0x8000FF00) // Semi-transparent light green
+
 @Composable
 fun ChessScreen(
     application: Application,
@@ -149,7 +152,7 @@ fun ChessScreen(
                                     .size(cellDp)
                                     .align(Alignment.TopStart)
                                     .offset(x = overlayX, y = overlayY)
-                                    .background(Color(0x8000FF00)) // Semi-transparent light green (50% opacity)
+                                    .background(SelectedCellOverlayColor)
                             )
                         }
 

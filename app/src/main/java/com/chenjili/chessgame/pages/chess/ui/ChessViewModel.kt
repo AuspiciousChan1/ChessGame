@@ -138,17 +138,15 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 
                 if (selectedPiece != null) {
-                    // Remove piece at destination if exists (capture)
-                    val updatedPieces = currentState.pieces
-                        .filter { !(it.column == column && it.row == row) }
-                        .map { piece ->
-                            if (piece.column == selectedCol && piece.row == selectedRow) {
-                                // Move the selected piece to the new position
-                                piece.copy(column = column, row = row)
-                            } else {
-                                piece
-                            }
+                    // Remove piece at destination if exists (capture) and move selected piece
+                    val updatedPieces = currentState.pieces.mapNotNull { piece ->
+                        when {
+                            piece.column == column && piece.row == row -> null // Remove captured piece
+                            piece.column == selectedCol && piece.row == selectedRow -> 
+                                piece.copy(column = column, row = row) // Move selected piece
+                            else -> piece // Keep other pieces unchanged
                         }
+                    }
                     
                     _state.value = currentState.copy(
                         pieces = updatedPieces,
