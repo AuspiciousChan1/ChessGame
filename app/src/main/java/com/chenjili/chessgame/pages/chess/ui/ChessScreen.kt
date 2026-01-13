@@ -3,6 +3,7 @@ package com.chenjili.chessgame.pages.chess.ui
 
 import android.app.Application
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -37,6 +39,9 @@ import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import java.util.ArrayList
 import kotlin.div
 import kotlin.text.toInt
+
+// Constants for UI
+private val SelectedCellOverlayColor = Color(0x8000FF00) // Semi-transparent light green
 
 @Composable
 fun ChessScreen(
@@ -135,6 +140,20 @@ fun ChessScreen(
                                         .offset(x = x, y = y)
                                 )
                             }
+                        }
+
+                        // Render semi-transparent light green overlay on selected cell
+                        state.selectedCell?.let { (selectedColumn, selectedRow) ->
+                            val overlayX = cellDp * selectedColumn
+                            val overlayY = cellDp * (7 - selectedRow)
+                            
+                            Box(
+                                modifier = Modifier
+                                    .size(cellDp)
+                                    .align(Alignment.TopStart)
+                                    .offset(x = overlayX, y = overlayY)
+                                    .background(SelectedCellOverlayColor)
+                            )
                         }
 
                         // 2) 透明点击层（放在最上面，覆盖整个棋盘）
