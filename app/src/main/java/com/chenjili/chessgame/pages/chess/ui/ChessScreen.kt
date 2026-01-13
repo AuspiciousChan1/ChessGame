@@ -42,11 +42,9 @@ import kotlin.text.toInt
 fun ChessScreen(
     application: Application,
     paddingDp: Dp = 8.dp,
-    playerColor: PlayerColor = PlayerColor.White,
-    pieces: List<ChessPieceDisplay> = remember { ArrayList() },
+    state: ChessState = ChessState(),
     onBoardLayoutChanged: (x: Dp, y: Dp, width: Dp, height: Dp) -> Unit = { _, _, _, _ -> },
-    onPlayerColorChanged: (PlayerColor) -> Unit = { _ -> },
-    onBoardCellClicked: (column: Int, row: Int) -> Unit = { _, _ -> }
+    onIntent: (ChessIntent) -> Unit = { }
 ) {
     ChessGameTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -89,7 +87,7 @@ fun ChessScreen(
                             modifier = Modifier
                                 .size(squareSize)
                                 .align(Alignment.TopStart)
-                                .rotate(if (playerColor == PlayerColor.Black) 180f else 0f)
+                                .rotate(if (state.playerColor == PlayerColor.Black) 180f else 0f)
                         )
 //                    // 使用自定义 View 作为棋盘背景
 //                    AndroidView(
@@ -111,7 +109,7 @@ fun ChessScreen(
                         val pieceDp = cellDp * 0.8f
                         val pieceOffsetInner = (cellDp - pieceDp) / 2f
 
-                        pieces.forEach { piece ->
+                        state.pieces.forEach { piece ->
                             val x = (cellDp * piece.column) + pieceOffsetInner
                             val y = (cellDp * (7 - piece.row)) + pieceOffsetInner
 
@@ -146,7 +144,7 @@ fun ChessScreen(
                         androidx.compose.foundation.layout.Box(
                             modifier = Modifier
                                 .matchParentSize()
-                                .pointerInput(playerColor, boardSizePx) {
+                                .pointerInput(state.playerColor, boardSizePx) {
                                     detectTapGestures { tap: Offset ->
                                         // tap 是相对该 Box（棋盘左上角）的坐标，单位 px
                                         val x = tap.x.coerceIn(0f, boardSizePx - 0.001f)
@@ -160,12 +158,12 @@ fun ChessScreen(
                                         var row = 7 - rowFromTop
 
                                         // 若玩家视角为黑方，你对棋盘做了 rotate(180)，坐标也需要镜像
-                                        if (playerColor == PlayerColor.Black) {
+                                        if (state.playerColor == PlayerColor.Black) {
                                             column = 7 - column
                                             row = 7 - row
                                         }
 
-                                        onBoardCellClicked(column, row)
+                                        onIntent(ChessIntent.BoardCellClicked(column, row))
                                     }
                                 }
                         )
@@ -180,8 +178,8 @@ fun ChessScreen(
                         Button(
                             onClick = {
                                 val newColor =
-                                    if (playerColor == PlayerColor.White) PlayerColor.Black else PlayerColor.White
-                                onPlayerColorChanged(newColor)
+                                    if (state.playerColor == PlayerColor.White) PlayerColor.Black else PlayerColor.White
+                                onIntent(ChessIntent.PlayerColorChanged(newColor))
                             }
                         ) {
                             Text(text = stringResource(id = R.string.switch_side))

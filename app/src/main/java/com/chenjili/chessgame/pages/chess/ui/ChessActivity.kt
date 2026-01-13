@@ -35,12 +35,14 @@ class ChessActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val pieces by viewModel.pieces.collectAsState()
-            val color by viewModel.color.collectAsState()
-            ChessScreen(application=this@ChessActivity.application, playerColor=color, pieces = pieces,
+            val state by viewModel.state.collectAsState()
+            ChessScreen(
+                application = this@ChessActivity.application,
+                state = state,
                 onBoardLayoutChanged = { x: Dp, y: Dp, width: Dp, height: Dp ->
                     Log.i(TAG, "x=$x, y=$y, width=$width, height=$height")
-                }, onPlayerColorChanged = viewModel::onPlayerColorChanged,onBoardCellClicked=viewModel::onBoardCellClicked
+                },
+                onIntent = viewModel::processIntent
             )
         }
     }
