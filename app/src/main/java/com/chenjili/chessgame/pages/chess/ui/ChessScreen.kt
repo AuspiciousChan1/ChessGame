@@ -22,6 +22,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -118,50 +119,52 @@ fun ChessScreen(
                         val pieceDp = cellDp * 0.8f
                         val pieceOffsetInner = (cellDp - pieceDp) / 2f
 
-                        state.pieces.forEach { piece ->
-                            val targetX = (cellDp * piece.column) + pieceOffsetInner
-                            val targetY = (cellDp * (7 - piece.row)) + pieceOffsetInner
+                        state.pieces.sortedBy { it.id }.forEach { piece ->
+                            key(piece.id) {
+                                val targetX = (cellDp * piece.column) + pieceOffsetInner
+                                val targetY = (cellDp * (7 - piece.row)) + pieceOffsetInner
 
-                            // Animate the position with spring animation
-                            val animatedX by animateDpAsState(
-                                targetValue = targetX,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessMedium
-                                ),
-                                label = "pieceX_${piece.id}"
-                            )
-                            
-                            val animatedY by animateDpAsState(
-                                targetValue = targetY,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessMedium
-                                ),
-                                label = "pieceY_${piece.id}"
-                            )
-
-                            val typeName = when (piece.type) {
-                                PieceType.KING -> "king"
-                                PieceType.QUEEN -> "queen"
-                                PieceType.ROOK -> "rook"
-                                PieceType.BISHOP -> "bishop"
-                                PieceType.KNIGHT -> "knight"
-                                PieceType.PAWN -> "pawn"
-                            }
-                            val colorName = if (piece.color == PlayerColor.White) "white" else "black"
-                            val resName = "chess_piece_${colorName}_$typeName"
-                            val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
-
-                            if (resId != 0) {
-                                Image(
-                                    painter = painterResource(id = resId),
-                                    contentDescription = "${colorName}_$typeName",
-                                    modifier = Modifier
-                                        .size(pieceDp)
-                                        .align(Alignment.TopStart)
-                                        .offset(x = animatedX, y = animatedY)
+                                // Animate the position with spring animation
+                                val animatedX by animateDpAsState(
+                                    targetValue = targetX,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    ),
+                                    label = "pieceX_${piece.id}"
                                 )
+
+                                val animatedY by animateDpAsState(
+                                    targetValue = targetY,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    ),
+                                    label = "pieceY_${piece.id}"
+                                )
+
+                                val typeName = when (piece.type) {
+                                    PieceType.KING -> "king"
+                                    PieceType.QUEEN -> "queen"
+                                    PieceType.ROOK -> "rook"
+                                    PieceType.BISHOP -> "bishop"
+                                    PieceType.KNIGHT -> "knight"
+                                    PieceType.PAWN -> "pawn"
+                                }
+                                val colorName = if (piece.color == PlayerColor.White) "white" else "black"
+                                val resName = "chess_piece_${colorName}_$typeName"
+                                val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
+
+                                if (resId != 0) {
+                                    Image(
+                                        painter = painterResource(id = resId),
+                                        contentDescription = "${colorName}_$typeName",
+                                        modifier = Modifier
+                                            .size(pieceDp)
+                                            .align(Alignment.TopStart)
+                                            .offset(x = animatedX, y = animatedY)
+                                    )
+                                }
                             }
                         }
 
