@@ -21,7 +21,8 @@ data class ChessPieceDisplay(
     val type: PieceType,
     val color: PlayerColor,
     val column: Int, // 0..7 白方对应a-h；黑方对应h-a
-    val row: Int  // 0..7 白方对应1-8；黑方对应8-1
+    val row: Int,  // 0..7 白方对应1-8；黑方对应8-1
+    val id: Int // Unique identifier for animation tracking
 )
 
 // MVI: Intent - 表示用户的所有可能操作
@@ -45,32 +46,34 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             // 初始化棋盘
             val initialPieces = mutableListOf<ChessPieceDisplay>()
+            var pieceId = 0
+            
             // 白方底线 rank = 0
             initialPieces += listOf(
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.White, 0, 0),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.White, 1, 0),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.White, 2, 0),
-                ChessPieceDisplay(PieceType.QUEEN, PlayerColor.White, 3, 0),
-                ChessPieceDisplay(PieceType.KING, PlayerColor.White, 4, 0),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.White, 5, 0),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.White, 6, 0),
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.White, 7, 0)
+                ChessPieceDisplay(PieceType.ROOK, PlayerColor.White, 0, 0, pieceId++),
+                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.White, 1, 0, pieceId++),
+                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.White, 2, 0, pieceId++),
+                ChessPieceDisplay(PieceType.QUEEN, PlayerColor.White, 3, 0, pieceId++),
+                ChessPieceDisplay(PieceType.KING, PlayerColor.White, 4, 0, pieceId++),
+                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.White, 5, 0, pieceId++),
+                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.White, 6, 0, pieceId++),
+                ChessPieceDisplay(PieceType.ROOK, PlayerColor.White, 7, 0, pieceId++)
             )
             // 白兵 rank = 1
-            for (f in 0..7) initialPieces += ChessPieceDisplay(PieceType.PAWN, PlayerColor.White, f, 1)
+            for (f in 0..7) initialPieces += ChessPieceDisplay(PieceType.PAWN, PlayerColor.White, f, 1, pieceId++)
 
             // 黑兵 rank = 6
-            for (f in 0..7) initialPieces += ChessPieceDisplay(PieceType.PAWN, PlayerColor.Black, f, 6)
+            for (f in 0..7) initialPieces += ChessPieceDisplay(PieceType.PAWN, PlayerColor.Black, f, 6, pieceId++)
             // 黑方底线 rank = 7
             initialPieces += listOf(
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.Black, 0, 7),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.Black, 1, 7),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.Black, 2, 7),
-                ChessPieceDisplay(PieceType.QUEEN, PlayerColor.Black, 3, 7),
-                ChessPieceDisplay(PieceType.KING, PlayerColor.Black, 4, 7),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.Black, 5, 7),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.Black, 6, 7),
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.Black, 7, 7)
+                ChessPieceDisplay(PieceType.ROOK, PlayerColor.Black, 0, 7, pieceId++),
+                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.Black, 1, 7, pieceId++),
+                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.Black, 2, 7, pieceId++),
+                ChessPieceDisplay(PieceType.QUEEN, PlayerColor.Black, 3, 7, pieceId++),
+                ChessPieceDisplay(PieceType.KING, PlayerColor.Black, 4, 7, pieceId++),
+                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.Black, 5, 7, pieceId++),
+                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.Black, 6, 7, pieceId++),
+                ChessPieceDisplay(PieceType.ROOK, PlayerColor.Black, 7, 7, pieceId++)
             )
             _state.value = ChessState(
                 pieces = initialPieces,
