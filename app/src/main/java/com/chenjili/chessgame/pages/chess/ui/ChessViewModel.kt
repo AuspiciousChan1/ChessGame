@@ -25,6 +25,15 @@ data class ChessPieceDisplay(
     val id: Int // Unique identifier for animation tracking
 )
 
+data class ChessMove(
+    val pieceType: PieceType,
+    val fromColumn: Int,
+    val fromRow: Int,
+    val toColumn: Int,
+    val toRow: Int,
+    val notation: String // e.g., "Nb1-c3"
+)
+
 // MVI: Intent - 表示用户的所有可能操作
 sealed interface ChessIntent {
     data class PlayerColorChanged(val newColor: PlayerColor) : ChessIntent
@@ -35,7 +44,8 @@ sealed interface ChessIntent {
 data class ChessState(
     val pieces: List<ChessPieceDisplay> = emptyList(),
     val playerColor: PlayerColor = PlayerColor.White,
-    val selectedCell: Pair<Int, Int>? = null // (column, row) of the selected cell
+    val selectedCell: Pair<Int, Int>? = null, // (column, row) of the selected cell
+    val moveHistory: List<ChessMove> = emptyList() // History of all moves
 )
 
 class ChessViewModel(application: Application) : AndroidViewModel(application) {
@@ -79,6 +89,25 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 pieces = initialPieces,
                 playerColor = PlayerColor.White
             )
+        }
+    }
+
+    // Helper function to convert column and row to chess notation
+    private fun positionToNotation(column: Int, row: Int): String {
+        val file = ('a' + column).toString()
+        val rank = (row + 1).toString()
+        return "$file$rank"
+    }
+
+    // Helper function to get piece notation prefix
+    private fun getPieceNotation(pieceType: PieceType): String {
+        return when (pieceType) {
+            PieceType.KING -> "K"
+            PieceType.QUEEN -> "Q"
+            PieceType.ROOK -> "R"
+            PieceType.BISHOP -> "B"
+            PieceType.KNIGHT -> "N"
+            PieceType.PAWN -> ""
         }
     }
 
@@ -141,6 +170,21 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 
                 if (selectedPiece != null) {
+                    // Create move notation
+                    val fromNotation = positionToNotation(selectedCol, selectedRow)
+                    val toNotation = positionToNotation(column, row)
+                    val pieceNotation = getPieceNotation(selectedPiece.type)
+                    val moveNotation = "$pieceNotation$fromNotation-$toNotation"
+                    
+                    val newMove = ChessMove(
+                        pieceType = selectedPiece.type,
+                        fromColumn = selectedCol,
+                        fromRow = selectedRow,
+                        toColumn = column,
+                        toRow = row,
+                        notation = moveNotation
+                    )
+                    
                     // Remove piece at destination if exists (capture) and move selected piece
                     val updatedPieces = currentState.pieces.mapNotNull { piece ->
                         when {
@@ -156,7 +200,8 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                     
                     _state.value = currentState.copy(
                         pieces = updatedPieces,
-                        selectedCell = null
+                        selectedCell = null,
+                        moveHistory = currentState.moveHistory + newMove
                     )
                 } else {
                     // No piece found at selected cell (shouldn't happen), just deselect

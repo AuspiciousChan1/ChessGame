@@ -14,9 +14,14 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -228,6 +233,35 @@ fun ChessScreen(
                             }
                         ) {
                             Text(text = stringResource(id = R.string.switch_side))
+                        }
+                    }
+                    
+                    // Chess move history section
+                    if (state.moveHistory.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .size(squareSize, 200.dp)
+                                .padding(top = 8.dp)
+                        ) {
+                            Text(
+                                text = "棋谱",
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .background(Color(0xFFF5F5F5))
+                                    .padding(8.dp),
+                                state = rememberLazyListState()
+                            ) {
+                                items(state.moveHistory) { move ->
+                                    Text(
+                                        text = move.notation,
+                                        modifier = Modifier.padding(vertical = 2.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
