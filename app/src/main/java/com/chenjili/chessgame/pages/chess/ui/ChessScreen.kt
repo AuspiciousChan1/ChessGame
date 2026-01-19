@@ -47,6 +47,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import java.util.ArrayList
+import kotlin.collections.get
 import kotlin.div
 import kotlin.text.toInt
 
@@ -247,6 +248,23 @@ fun ChessScreen(
                                 text = stringResource(R.string.game_record),
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
+
+                            // 预处理：把 moveHistory 的 notation 按两步一组转换为 (moveNumber, white, black)
+                            val movePairs = remember(state.moveHistory) {
+                                val notations = state.moveHistory.map { it.notation }
+                                val pairs = ArrayList<Triple<Int, String, String>>()
+                                var i = 0
+                                var moveNum = 1
+                                while (i < notations.size) {
+                                    val white = notations[i]
+                                    val black = if (i + 1 < notations.size) notations[i + 1] else "--"
+                                    pairs.add(Triple(moveNum, white, black))
+                                    moveNum++
+                                    i += 2
+                                }
+                                pairs
+                            }
+
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -255,11 +273,37 @@ fun ChessScreen(
                                     .padding(8.dp),
                                 state = rememberLazyListState()
                             ) {
-                                items(state.moveHistory) { move ->
-                                    Text(
-                                        text = move.notation,
-                                        modifier = Modifier.padding(vertical = 2.dp)
-                                    )
+                                items(movePairs) { (num, whiteMove, blackMove) ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // 序号列
+                                        Text(
+                                            text = "$num.",
+                                            modifier = Modifier
+                                                .weight(0.15f)
+                                                .padding(start = 4.dp),
+                                        )
+
+                                        // 白棋列（中间）
+                                        Text(
+                                            text = whiteMove,
+                                            modifier = Modifier
+                                                .weight(0.425f)
+                                                .padding(start = 8.dp),
+                                        )
+
+                                        // 黑棋列（右）
+                                        Text(
+                                            text = blackMove,
+                                            modifier = Modifier
+                                                .weight(0.425f)
+                                                .padding(start = 8.dp),
+                                        )
+                                    }
                                 }
                             }
                         }
