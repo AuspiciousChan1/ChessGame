@@ -244,7 +244,7 @@ fun ChessScreen(
                                 .padding(top = 8.dp)
                         ) {
                             Text(
-                                text = "棋谱",
+                                text = stringResource(R.string.game_record),
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
                             LazyColumn(
