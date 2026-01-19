@@ -702,7 +702,9 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
             }
         }
         
-        // Check for fifty-move rule (50 moves = 100 half-moves/plies)
+        // Check for fifty-move rule
+        // The rule allows a draw if 50 full moves (100 half-moves/plies) pass
+        // without a pawn move or capture
         if (halfMoveClock >= 100) {
             return GameState.DRAW_BY_FIFTY_MOVE_RULE
         }
@@ -747,6 +749,13 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     
     override fun getMoveHistory(): List<Move> = moveHistory.toList()
     
+    /**
+     * Parse algebraic chess notation to a Move object
+     * Note: This is a simplified parser that handles common PGN formats.
+     * It may not handle all edge cases of algebraic notation, particularly
+     * complex disambiguation scenarios or non-standard notation variants.
+     * For production use, consider using a more robust PGN parsing library.
+     */
     private fun parseMoveFromAlgebraic(moveStr: String): Move? {
         // Handle castling
         if (moveStr == "O-O" || moveStr == "O-O-O") {
