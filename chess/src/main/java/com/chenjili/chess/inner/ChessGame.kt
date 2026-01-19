@@ -2,6 +2,11 @@ package com.chenjili.chess.inner
 
 import com.chenjili.chess.api.*
 import java.util.UUID
+import kotlin.div
+import kotlin.inc
+import kotlin.text.compareTo
+import kotlin.text.get
+import kotlin.to
 
 /**
  * Implementation of a chess game
@@ -289,19 +294,25 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         
         // Check if move is legal
         val legalMoves = getLegalMoves(from)
-        val matchingMove = legalMoves.find { it.from == from && it.to == to }
-            ?: return null
         
+        val matchingMove = legalMoves.find { it.from == from && it.to == to } ?: return null
         // Handle promotion
-        val finalPromotionPiece = if (piece.type == PieceType.PAWN && 
+        val finalPromotionPiece = if (piece.type == PieceType.PAWN &&
             (to.rank == 7 || to.rank == 0)) {
             promotionPiece ?: PieceType.QUEEN
         } else null
         
-        val capturedPiece = getPieceAt(to)
         val isEnPassant = matchingMove.isEnPassant
         val isCastling = matchingMove.isCastling
         
+        // Determine captured piece (handle en passant)
+        var capturedPiece: Piece? = if (isEnPassant) {
+            // The captured pawn is on the same rank as 'from' and in file 'to.file'
+            getPieceAt(Position(to.file, from.rank))
+        } else {
+            getPieceAt(to)
+        }
+
         // Execute move
         board[from.rank][from.file] = null
         
@@ -309,22 +320,25 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
             // Move king
             board[to.rank][to.file] = piece
             
-            // Move rook
+            // Move rook accordingly
             if (to.file > from.file) {
-                // Kingside castling
+                // King-side castling: rook from file 7 to file 5
+                val rook = board[from.rank][7]
                 board[from.rank][7] = null
-                board[from.rank][5] = Piece(PieceType.ROOK, activeColor)
+                board[from.rank][5] = rook
             } else {
-                // Queenside castling
+                // Queen-side castling: rook from file 0 to file 3
+                val rook = board[from.rank][0]
                 board[from.rank][0] = null
-                board[from.rank][3] = Piece(PieceType.ROOK, activeColor)
+                board[from.rank][3] = rook
             }
         } else if (isEnPassant) {
-            // Remove captured pawn
-            board[from.rank][to.file] = null
+            // Place moving pawn to destination
             board[to.rank][to.file] = piece
+            // Remove the captured pawn which sits at (to.file, from.rank)
+            board[from.rank][to.file] = null
         } else {
-            // Normal move or capture
+            // Normal move or capture or promotion
             if (finalPromotionPiece != null) {
                 board[to.rank][to.file] = Piece(finalPromotionPiece, piece.color)
             } else {
@@ -336,13 +350,13 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         updateCastlingRights(piece, from)
         
         // Update en passant target
-        enPassantTarget = if (piece.type == PieceType.PAWN && 
+        enPassantTarget = if (piece.type == PieceType.PAWN &&
             kotlin.math.abs(to.rank - from.rank) == 2) {
             Position(from.file, (from.rank + to.rank) / 2)
         } else null
         
         // Update half-move clock
-        halfMoveClock = if (piece.type == PieceType.PAWN || capturedPiece != null) 0 
+        halfMoveClock = if (piece.type == PieceType.PAWN || capturedPiece != null) 0
         else halfMoveClock + 1
         
         // Update full move number
