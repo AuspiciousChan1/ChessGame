@@ -31,13 +31,14 @@ data class ChessMove(
     val fromRow: Int,
     val toColumn: Int,
     val toRow: Int,
+    val playerColor: PlayerColor,
     val notation: String // e.g., "Nb1-c3"
 )
 
 // MVI: Intent - 表示用户的所有可能操作
 sealed interface ChessIntent {
     data class PlayerColorChanged(val newColor: PlayerColor) : ChessIntent
-    data class BoardCellClicked(val column: Int, val row: Int) : ChessIntent
+    data class BoardCellClicked(val column: Int, val row: Int, val playerColor: PlayerColor) : ChessIntent
 }
 
 // MVI: State - 表示整个UI状态
@@ -93,9 +94,11 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Helper function to convert column and row to chess notation
-    private fun positionToNotation(column: Int, row: Int): String {
-        val file = ('a' + column).toString()
-        val rank = (row + 1).toString()
+    private fun positionToNotation(column: Int, row: Int, playerColor: PlayerColor): String {
+        val transformedColumn = if (playerColor == PlayerColor.White) column else 7 - column
+        val transformedRow = if (playerColor == PlayerColor.White) row else 7 - row
+        val file = ('a' + transformedColumn).toString()
+        val rank = (transformedRow + 1).toString()
         return "$file$rank"
     }
 
@@ -115,7 +118,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     fun processIntent(intent: ChessIntent) {
         when (intent) {
             is ChessIntent.PlayerColorChanged -> handlePlayerColorChanged(intent.newColor)
-            is ChessIntent.BoardCellClicked -> handleBoardCellClicked(intent.column, intent.row)
+            is ChessIntent.BoardCellClicked -> handleBoardCellClicked(intent.column, intent.row, intent.playerColor)
         }
     }
 
@@ -135,7 +138,14 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    private fun handleBoardCellClicked(column: Int, row: Int) {
+    /**
+     * 处理棋盘格子点击事件
+     * @param column 被点击的列 (0-7)，不受棋盘被翻转的影响
+     * @param row 被点击的行 (0-7)，不受棋盘被翻转的影响
+     * @param playerColor 当前玩家颜色
+     */
+    private fun handleBoardCellClicked(column: Int, row: Int, playerColor: PlayerColor) {
+        val playerColor = _state.value.playerColor
         // Check if click is within valid board range
         if (column !in 0..7 || row !in 0..7) {
             // Click outside board - clear selection
@@ -171,8 +181,8 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 
                 if (selectedPiece != null) {
                     // Create move notation
-                    val fromNotation = positionToNotation(selectedCol, selectedRow)
-                    val toNotation = positionToNotation(column, row)
+                    val fromNotation = positionToNotation(selectedCol, selectedRow, playerColor)
+                    val toNotation = positionToNotation(column, row, playerColor)
                     val pieceNotation = getPieceNotation(selectedPiece.type)
                     val moveNotation = "$pieceNotation$fromNotation-$toNotation"
                     
@@ -182,6 +192,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                         fromRow = selectedRow,
                         toColumn = column,
                         toRow = row,
+                        playerColor = playerColor,
                         notation = moveNotation
                     )
                     

@@ -197,7 +197,6 @@ fun ChessScreen(
                                 .matchParentSize()
                                 .pointerInput(state.playerColor, boardSizePx) {
                                     detectTapGestures { tap: Offset ->
-                                        // tap 是相对该 Box（棋盘左上角）的坐标，单位 px
                                         val x = tap.x.coerceIn(0f, boardSizePx - 0.001f)
                                         val y = tap.y.coerceIn(0f, boardSizePx - 0.001f)
 
@@ -208,13 +207,7 @@ fun ChessScreen(
                                         var column = colFromLeft
                                         var row = 7 - rowFromTop
 
-                                        // 若玩家视角为黑方，你对棋盘做了 rotate(180)，坐标也需要镜像
-                                        if (state.playerColor == PlayerColor.Black) {
-                                            column = 7 - column
-                                            row = 7 - row
-                                        }
-
-                                        onIntent(ChessIntent.BoardCellClicked(column, row))
+                                        onIntent(ChessIntent.BoardCellClicked(column, row, state.playerColor))
                                     }
                                 }
                         )
