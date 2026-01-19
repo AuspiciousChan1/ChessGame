@@ -31,7 +31,7 @@ data class ChessMove(
     val fromRow: Int,
     val toColumn: Int,
     val toRow: Int,
-    val playerColor: PlayerColor,
+    val pieceColor: PlayerColor,
     val notation: String // e.g., "Nb1-c3"
 )
 
@@ -192,7 +192,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                         fromRow = selectedRow,
                         toColumn = column,
                         toRow = row,
-                        playerColor = playerColor,
+                        pieceColor = selectedPiece.color,
                         notation = moveNotation
                     )
                     

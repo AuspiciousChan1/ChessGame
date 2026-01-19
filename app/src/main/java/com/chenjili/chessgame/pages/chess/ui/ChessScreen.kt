@@ -43,13 +43,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import java.util.ArrayList
-import kotlin.collections.get
-import kotlin.div
-import kotlin.text.toInt
 
 // Constants for UI
 private val SelectedCellOverlayColor = Color(0x8000FF00) // Semi-transparent light green
@@ -207,7 +203,13 @@ fun ChessScreen(
                                         var column = colFromLeft
                                         var row = 7 - rowFromTop
 
-                                        onIntent(ChessIntent.BoardCellClicked(column, row, state.playerColor))
+                                        onIntent(
+                                            ChessIntent.BoardCellClicked(
+                                                column,
+                                                row,
+                                                state.playerColor
+                                            )
+                                        )
                                     }
                                 }
                         )
@@ -243,19 +245,38 @@ fun ChessScreen(
                             )
 
                             // 预处理：把 moveHistory 的 notation 按两步一组转换为 (moveNumber, white, black)
+                            val notationEmptyMove = stringResource(R.string.notation_empty_move)
                             val movePairs = remember(state.moveHistory) {
-                                val notations = state.moveHistory.map { it.notation }
-                                val pairs = ArrayList<Triple<Int, String, String>>()
-                                var i = 0
+                                val moves = state.moveHistory
+                                val triples = ArrayList<Triple<Int, String, String>>()
                                 var moveNum = 1
-                                while (i < notations.size) {
-                                    val white = notations[i]
-                                    val black = if (i + 1 < notations.size) notations[i + 1] else "--"
-                                    pairs.add(Triple(moveNum, white, black))
-                                    moveNum++
-                                    i += 2
+                                var whiteCache: String = ""
+                                for (move in moves) {
+                                    val notation = move.notation
+                                    val pieceColor = move.pieceColor
+                                    when(pieceColor) {
+                                        PlayerColor.White -> {
+                                            if (whiteCache.isNotEmpty()) {
+                                                // 上一步白棋未配对，补全黑棋为 "--"
+                                                triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
+                                                ++moveNum
+                                            }
+                                            // 记录当前的白棋走子
+                                            whiteCache = notation
+                                        }
+                                        PlayerColor.Black -> {
+                                            val whiteNotation = if (whiteCache.isNotEmpty()) whiteCache else notationEmptyMove
+                                            triples.add(Triple(moveNum, whiteNotation, notation))
+                                            whiteCache = ""
+                                            ++moveNum
+                                        }
+                                    }
                                 }
-                                pairs
+                                if (whiteCache.isNotEmpty()) {
+                                    // 最后一步是白棋，补全黑棋为 "--"
+                                    triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
+                                }
+                                triples
                             }
 
                             LazyColumn(
