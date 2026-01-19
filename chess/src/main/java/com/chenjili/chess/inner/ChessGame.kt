@@ -702,7 +702,7 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
             }
         }
         
-        // Check for fifty-move rule
+        // Check for fifty-move rule (50 moves = 100 half-moves/plies)
         if (halfMoveClock >= 100) {
             return GameState.DRAW_BY_FIFTY_MOVE_RULE
         }
@@ -748,8 +748,75 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     override fun getMoveHistory(): List<Move> = moveHistory.toList()
     
     private fun parseMoveFromAlgebraic(moveStr: String): Move? {
-        // Simplified move parsing - for full implementation, would need comprehensive parsing
-        // This is a basic version that handles simple cases
+        // Handle castling
+        if (moveStr == "O-O" || moveStr == "O-O-O") {
+            val kingRank = if (activeColor == PieceColor.WHITE) 0 else 7
+            val kingFrom = Position(4, kingRank)
+            val kingTo = if (moveStr == "O-O") {
+                Position(6, kingRank)
+            } else {
+                Position(2, kingRank)
+            }
+            
+            // Check if this is a legal move
+            val legalMoves = getLegalMoves(kingFrom)
+            return legalMoves.find { it.to == kingTo }
+        }
+        
+        // For simplicity, we'll try to find the move by checking all legal moves
+        // and matching the destination square and piece type
+        val cleanMove = moveStr.replace(Regex("[+#!?]"), "") // Remove check/mate indicators
+        
+        // Extract destination square (always last 2 characters for normal moves)
+        val destMatch = Regex("[a-h][1-8]").findAll(cleanMove).lastOrNull()
+        val destSquare = destMatch?.value?.let { Position.fromAlgebraic(it) } ?: return null
+        
+        // Determine piece type from first character
+        val pieceType = when {
+            cleanMove.startsWith('K') -> PieceType.KING
+            cleanMove.startsWith('Q') -> PieceType.QUEEN
+            cleanMove.startsWith('R') -> PieceType.ROOK
+            cleanMove.startsWith('B') -> PieceType.BISHOP
+            cleanMove.startsWith('N') -> PieceType.KNIGHT
+            else -> PieceType.PAWN
+        }
+        
+        // Check for promotion
+        val promotionPiece = if (cleanMove.contains('=')) {
+            when {
+                cleanMove.contains("=Q") -> PieceType.QUEEN
+                cleanMove.contains("=R") -> PieceType.ROOK
+                cleanMove.contains("=B") -> PieceType.BISHOP
+                cleanMove.contains("=N") -> PieceType.KNIGHT
+                else -> null
+            }
+        } else null
+        
+        // Find all legal moves that match this description
+        val allLegalMoves = getLegalMoves()
+        val matchingMoves = allLegalMoves.filter { move ->
+            move.to == destSquare && 
+            move.piece.type == pieceType &&
+            move.piece.color == activeColor
+        }
+        
+        // If there's only one matching move, use it
+        if (matchingMoves.size == 1) {
+            return matchingMoves[0]
+        }
+        
+        // If there are multiple matching moves, we need to disambiguate
+        // Extract disambiguation info (file or rank)
+        if (matchingMoves.size > 1) {
+            val disambiguationFile = Regex("[a-h]").find(cleanMove.drop(1))?.value?.let { it[0] - 'a' }
+            val disambiguationRank = Regex("[1-8]").find(cleanMove.drop(1).dropLast(2))?.value?.let { it[0] - '1' }
+            
+            return matchingMoves.find { move ->
+                (disambiguationFile == null || move.from.file == disambiguationFile) &&
+                (disambiguationRank == null || move.from.rank == disambiguationRank)
+            }
+        }
+        
         return null
     }
 }
