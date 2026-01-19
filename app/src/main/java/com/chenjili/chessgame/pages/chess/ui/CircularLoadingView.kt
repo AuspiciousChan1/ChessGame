@@ -115,7 +115,6 @@ class CircularLoadingView @JvmOverloads constructor(
         // 圆环外半径和内半径
         val outerRadius = size * 0.4f
         val innerRadius = size * 0.25f
-        val ringThickness = outerRadius - innerRadius
         
         // 绘制圆环的每个分段
         val anglePerSegment = 360f / segments
@@ -135,16 +134,6 @@ class CircularLoadingView @JvmOverloads constructor(
             
             // 绘制圆环分段 (使用圆弧)
             ringPaint.color = color
-            rectF.set(
-                centerX - outerRadius,
-                centerY - outerRadius,
-                centerX + outerRadius,
-                centerY + outerRadius
-            )
-            
-            // 绘制扇形分段
-            canvas.save()
-            canvas.rotate(startAngle + anglePerSegment / 2, centerX, centerY)
             
             // 使用路径绘制圆环分段
             val path = Path()
@@ -181,7 +170,6 @@ class CircularLoadingView @JvmOverloads constructor(
             
             path.close()
             
-            canvas.restore()
             canvas.drawPath(path, ringPaint)
             
             // 绘制分段边框
