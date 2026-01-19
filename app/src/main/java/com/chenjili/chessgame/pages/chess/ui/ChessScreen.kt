@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import java.util.ArrayList
+import kotlin.div
 
 // Constants for UI
 private val SelectedCellOverlayColor = Color(0x8000FF00) // Semi-transparent light green
@@ -70,12 +71,15 @@ fun ChessScreen(
                 val squareSize = minOf(maxW, maxH) - paddingDp * 2f
                 val density = LocalDensity.current
                 val context = LocalContext.current
+                val initialTopOffset = remember { (maxH - squareSize) / 2f }
 
-                Column(modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingDp),
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingDp)
+                        .padding(top = initialTopOffset), // 固定顶部偏移，防止后续内容变化导致移动
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Top // 改为从顶部开始布局
                 ) {
                     Box(
                         modifier = Modifier
