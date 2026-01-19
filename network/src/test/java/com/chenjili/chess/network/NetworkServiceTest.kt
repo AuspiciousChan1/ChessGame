@@ -18,8 +18,8 @@ class NetworkServiceTest {
     
     @Before
     fun setUp() {
-        serverService = NetworkServiceFactory.networkService
-        clientService = NetworkServiceFactory.networkService
+        serverService = NetworkServiceFactory.createNetworkService()
+        clientService = NetworkServiceFactory.createNetworkService()
     }
     
     @After
@@ -34,7 +34,7 @@ class NetworkServiceTest {
     
     @Test
     fun testConnectionStateInitial() {
-        val service = NetworkServiceFactory.networkService
+        val service = NetworkServiceFactory.createNetworkService()
         assertEquals(ConnectionState.IDLE, service.getConnectionState())
         assertFalse(service.isConnected())
         assertNull(service.getConnectionInfo())
@@ -124,7 +124,7 @@ class NetworkServiceTest {
     
     @Test
     fun testSendMessageWhenNotConnected() {
-        val service = NetworkServiceFactory.networkService
+        val service = NetworkServiceFactory.createNetworkService()
         val message = NetworkMessage(MessageType.TEXT, "test")
         
         val result = service.sendMessage(message)

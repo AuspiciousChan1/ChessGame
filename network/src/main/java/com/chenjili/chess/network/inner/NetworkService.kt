@@ -29,8 +29,6 @@ class NetworkService: INetworkService {
     private var inputStream: DataInputStream? = null
     
     private val isRunning = AtomicBoolean(false)
-    private val serverThread: Thread? = null
-    private val receiveThread: Thread? = null
     
     override fun startServer(port: Int, listener: ConnectionStateListener): NetworkResult<Unit> {
         return try {
