@@ -37,7 +37,6 @@ class NetworkService: INetworkService {
             }
             
             this.listener = listener
-            updateConnectionState(ConnectionState.LISTENING, null)
             
             isRunning.set(true)
             
@@ -47,12 +46,15 @@ class NetworkService: INetworkService {
                     serverSocket = ServerSocket(port)
                     val localAddress = InetAddress.getLocalHost().hostAddress ?: "unknown"
                     
-                    listener.onConnectionStateChanged(
+                    // Notify listener once with connection info
+                    updateConnectionState(
                         ConnectionState.LISTENING,
                         ConnectionInfo(localAddress, port, true)
                     )
                     
-                    // Accept incoming connection
+                    // Accept one incoming connection for a paired long connection
+                    // This design supports a 1:1 connection model as per requirements
+                    // For multiple connections, create multiple NetworkService instances
                     val socket = serverSocket?.accept()
                     
                     if (socket != null && isRunning.get()) {

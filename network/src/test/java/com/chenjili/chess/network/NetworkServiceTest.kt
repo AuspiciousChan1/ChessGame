@@ -82,14 +82,21 @@ class NetworkServiceTest {
     
     @Test
     fun testStopServer() {
+        val latch = CountDownLatch(1)
         val listener = object : ConnectionStateListener {
-            override fun onConnectionStateChanged(state: ConnectionState, info: ConnectionInfo?) {}
+            override fun onConnectionStateChanged(state: ConnectionState, info: ConnectionInfo?) {
+                if (state == ConnectionState.LISTENING) {
+                    latch.countDown()
+                }
+            }
             override fun onMessageReceived(message: NetworkMessage) {}
             override fun onError(error: String, exception: Exception?) {}
         }
         
         serverService.startServer(8890, listener)
-        Thread.sleep(100)
+        
+        // Wait for server to start listening
+        assertTrue(latch.await(2, TimeUnit.SECONDS))
         
         serverService.stopServer()
         assertEquals(ConnectionState.IDLE, serverService.getConnectionState())
