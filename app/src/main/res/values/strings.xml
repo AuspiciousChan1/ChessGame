@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">ChessGame</string>
-    <string name="title_activity_chess">ChessActivity</string>
+    <string name="title_activity_chess">ChessPage</string>
     <string name="switch_side">switch side</string>
+    <string name="chess_board_description">Chess board</string>
+    <string name="game_record">Game record</string>
 </resources>

@@ -14,9 +14,14 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -42,6 +47,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import java.util.ArrayList
+import kotlin.collections.get
 import kotlin.div
 import kotlin.text.toInt
 
@@ -228,6 +234,78 @@ fun ChessScreen(
                             }
                         ) {
                             Text(text = stringResource(id = R.string.switch_side))
+                        }
+                    }
+                    
+                    // Chess move history section
+                    if (state.moveHistory.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .size(squareSize, 200.dp)
+                                .padding(top = 8.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.game_record),
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+
+                            // 预处理：把 moveHistory 的 notation 按两步一组转换为 (moveNumber, white, black)
+                            val movePairs = remember(state.moveHistory) {
+                                val notations = state.moveHistory.map { it.notation }
+                                val pairs = ArrayList<Triple<Int, String, String>>()
+                                var i = 0
+                                var moveNum = 1
+                                while (i < notations.size) {
+                                    val white = notations[i]
+                                    val black = if (i + 1 < notations.size) notations[i + 1] else "--"
+                                    pairs.add(Triple(moveNum, white, black))
+                                    moveNum++
+                                    i += 2
+                                }
+                                pairs
+                            }
+
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .background(Color(0xFFF5F5F5))
+                                    .padding(8.dp),
+                                state = rememberLazyListState()
+                            ) {
+                                items(movePairs) { (num, whiteMove, blackMove) ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // 序号列
+                                        Text(
+                                            text = "$num.",
+                                            modifier = Modifier
+                                                .weight(0.15f)
+                                                .padding(start = 4.dp),
+                                        )
+
+                                        // 白棋列（中间）
+                                        Text(
+                                            text = whiteMove,
+                                            modifier = Modifier
+                                                .weight(0.425f)
+                                                .padding(start = 8.dp),
+                                        )
+
+                                        // 黑棋列（右）
+                                        Text(
+                                            text = blackMove,
+                                            modifier = Modifier
+                                                .weight(0.425f)
+                                                .padding(start = 8.dp),
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
