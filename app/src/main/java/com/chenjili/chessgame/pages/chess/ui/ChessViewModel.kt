@@ -118,7 +118,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     fun processIntent(intent: ChessIntent) {
         when (intent) {
             is ChessIntent.PlayerColorChanged -> handlePlayerColorChanged(intent.newColor)
-            is ChessIntent.BoardCellClicked -> handleBoardCellClicked(intent.column, intent.row, intent.playerColor)
+            is ChessIntent.BoardCellClicked -> handleBoardCellClicked(intent.column, intent.row)
         }
     }
 
@@ -144,7 +144,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
      * @param row 被点击的行 (0-7)，不受棋盘被翻转的影响
      * @param playerColor 当前玩家颜色
      */
-    private fun handleBoardCellClicked(column: Int, row: Int, playerColor: PlayerColor) {
+    private fun handleBoardCellClicked(column: Int, row: Int) {
         val playerColor = _state.value.playerColor
         // Check if click is within valid board range
         if (column !in 0..7 || row !in 0..7) {
