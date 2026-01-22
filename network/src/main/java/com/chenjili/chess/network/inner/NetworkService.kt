@@ -1,8 +1,22 @@
 package com.chenjili.chess.network.inner
 
-import com.chenjili.chess.network.api.*
-import java.io.*
+import com.chenjili.chess.network.api.ConnectionInfo
+import com.chenjili.chess.network.api.ConnectionState
+import com.chenjili.chess.network.api.ConnectionStateListener
+import com.chenjili.chess.network.api.INetworkService
+import com.chenjili.chess.network.api.MessageType
+import com.chenjili.chess.network.api.NetworkMessage
+import com.chenjili.chess.network.api.NetworkResult
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.EOFException
+import java.net.DatagramSocket
+import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
@@ -44,8 +58,8 @@ class NetworkService: INetworkService {
             thread(name = "ServerThread") {
                 try {
                     serverSocket = ServerSocket(port)
-                    val localAddress = InetAddress.getLocalHost().hostAddress ?: "unknown"
-                    
+                    val localAddress = getLocalIpv4ByInterfaces() ?: InetAddress.getLocalHost().hostAddress ?: "unknown"
+
                     // Notify listener once with connection info
                     updateConnectionState(
                         ConnectionState.LISTENING,
@@ -58,7 +72,7 @@ class NetworkService: INetworkService {
                     val socket = serverSocket?.accept()
                     
                     if (socket != null && isRunning.get()) {
-                        handleClientConnection(socket, port, true)
+                        handleClientConnection(socket, true)
                     }
                 } catch (e: SocketException) {
                     if (isRunning.get()) {
@@ -76,18 +90,51 @@ class NetworkService: INetworkService {
             NetworkResult.Error("Failed to start server: ${e.message}", e)
         }
     }
-    
+
+    fun getLocalIpv4ByInterfaces(): String? {
+        try {
+            val candidates = mutableListOf<InetAddress>()
+            val nis = NetworkInterface.getNetworkInterfaces()
+            while (nis.hasMoreElements()) {
+                val ni = nis.nextElement()
+                if (!ni.isUp || ni.isLoopback || ni.isVirtual) continue
+                val addrs = ni.inetAddresses
+                while (addrs.hasMoreElements()) {
+                    val addr = addrs.nextElement()
+                    if (addr.isLoopbackAddress) continue
+                    val host = addr.hostAddress ?: continue
+                    if (host.contains(":")) continue // skip IPv6
+                    candidates.add(addr)
+                }
+            }
+            // 优先返回 site\-local（192.168/10/172.16-31）
+            val siteLocal = candidates.firstOrNull { it.isSiteLocalAddress }
+            return siteLocal?.hostAddress ?: candidates.firstOrNull()?.hostAddress
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
+    fun getLocalIpv4BySocket(remoteHost: String = "8.8.8.8", remotePort: Int = 53): String? {
+        return try {
+            DatagramSocket().use { socket ->
+                // connect 不会实际发送数据，但会绑定到用于到达 remote 的本地地址
+                socket.connect(InetSocketAddress(remoteHost, remotePort))
+                val addr = socket.localAddress
+                if (addr is Inet4Address) addr.hostAddress else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     override fun stopServer() {
         isRunning.set(false)
-        
-        try {
-            serverSocket?.close()
-            serverSocket = null
-        } catch (e: Exception) {
-            // Ignore
-        }
-        
-        disconnect()
+        try { serverSocket?.close() } catch (_: Exception) {}
+        serverSocket = null
+
+        // 若处于 CONNECTED，disconnect 会回 DISCONNECTED；否则直接回 IDLE
+        safeCloseClient()
         updateConnectionState(ConnectionState.IDLE, null)
     }
     
@@ -106,7 +153,7 @@ class NetworkService: INetworkService {
             thread(name = "ClientThread") {
                 try {
                     val socket = Socket(address, port)
-                    handleClientConnection(socket, port, false)
+                    handleClientConnection(socket, false)
                 } catch (e: Exception) {
                     listener.onError("Connection error: ${e.message}", e)
                     updateConnectionState(ConnectionState.ERROR, null)
@@ -119,23 +166,20 @@ class NetworkService: INetworkService {
             NetworkResult.Error("Failed to connect: ${e.message}", e)
         }
     }
-    
+
     override fun disconnect() {
         isRunning.set(false)
-        
-        try {
-            outputStream?.close()
-            inputStream?.close()
-            clientSocket?.close()
-            
-            outputStream = null
-            inputStream = null
-            clientSocket = null
-            
-            updateConnectionState(ConnectionState.DISCONNECTED, null)
-        } catch (e: Exception) {
-            listener?.onError("Error during disconnect: ${e.message}", e)
-        }
+        safeCloseClient()
+        updateConnectionState(ConnectionState.DISCONNECTED, null)
+    }
+
+    private fun safeCloseClient() {
+        try { inputStream?.close() } catch (_: Exception) {}
+        try { outputStream?.close() } catch (_: Exception) {}
+        try { clientSocket?.close() } catch (_: Exception) {}
+        inputStream = null
+        outputStream = null
+        clientSocket = null
     }
     
     override fun sendMessage(message: NetworkMessage): NetworkResult<Unit> {
@@ -176,24 +220,31 @@ class NetworkService: INetworkService {
     }
     
     // Private helper methods
-    
-    private fun handleClientConnection(socket: Socket, port: Int, isServer: Boolean) {
+
+    private fun handleClientConnection(socket: Socket, isServer: Boolean) {
         try {
             clientSocket = socket
-            outputStream = DataOutputStream(socket.getOutputStream())
-            inputStream = DataInputStream(socket.getInputStream())
-            
-            val remoteAddress = socket.inetAddress.hostAddress ?: "unknown"
-            val info = ConnectionInfo(remoteAddress, port, isServer)
-            
+            outputStream = DataOutputStream(BufferedOutputStream(socket.getOutputStream()))
+            inputStream = DataInputStream(BufferedInputStream(socket.getInputStream()))
+
+            val remoteIp = socket.inetAddress?.hostAddress ?: "unknown"
+            val remotePort = socket.port
+            val localIp = socket.localAddress?.hostAddress ?: "unknown"
+            val localPort = socket.localPort
+
+            // 若 ConnectionInfo 只能放一个 address/port，至少明确含义：
+            // - 服务端：address/port 记录对端（remote），因为这是“已连接对象”
+            // - LISTENING 时再单独上报本机可达地址
+            val info = ConnectionInfo(remoteIp, remotePort, isServer)
+
             updateConnectionState(ConnectionState.CONNECTED, info)
-            
-            // Start receiving messages
+
             startReceivingMessages()
-            
         } catch (e: Exception) {
             listener?.onError("Error setting up connection: ${e.message}", e)
+            safeCloseClient()
             updateConnectionState(ConnectionState.ERROR, null)
+            isRunning.set(false)
         }
     }
     
