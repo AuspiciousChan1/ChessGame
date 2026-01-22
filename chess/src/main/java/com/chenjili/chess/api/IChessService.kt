@@ -1,9 +1,11 @@
 package com.chenjili.chess.api
 
+import com.chenjili.chess.base.api.model.IService
+
 /**
  * Service for managing multiple chess game instances
  */
-interface IChessService {
+interface IChessService: IService {
     /**
      * Create a new chess game instance
      * @return New game instance with unique ID

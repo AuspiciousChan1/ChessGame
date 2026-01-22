@@ -1,10 +1,12 @@
 package com.chenjili.chess.network.api
 
+import com.chenjili.chess.base.api.model.IService
+
 /**
  * Network service interface for establishing and managing long connections
  * between devices in the same LAN or via hotspot
  */
-interface INetworkService {
+interface INetworkService: IService {
     
     /**
      * Start the service to listen for incoming connections (server mode)
