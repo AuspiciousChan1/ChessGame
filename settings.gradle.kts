@@ -23,4 +23,5 @@ rootProject.name = "ChessGame"
 include(":app")
 include(":chess")
 include(":network")
+include(":testtool")
 include(":base")
