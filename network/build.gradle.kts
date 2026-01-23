@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.chenjili.chess"
+    namespace = "com.chenjili.chess.network"
     compileSdk {
         version = release(36)
     }

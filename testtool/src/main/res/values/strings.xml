@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">testtool</string>
+    <string name="title_activity_network_service_test">NetworkServiceTestActivity</string>
+    <string name="title_activity_chess_service_test">ChessServiceTestActivity</string>
+</resources>
