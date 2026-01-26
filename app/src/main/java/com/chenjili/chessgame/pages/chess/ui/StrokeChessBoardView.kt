@@ -9,6 +9,7 @@ import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
 import androidx.core.content.ContextCompat
+import com.chenjili.chess.api.PieceColor
 import com.chenjili.chessgame.R
 import kotlin.math.min
 
@@ -36,7 +37,7 @@ class StrokeChessBoardView @JvmOverloads constructor(
     private var animator: ValueAnimator? = null
     private var perCellDurationMs: Long = 20L // 每个格子绘制时长，可调整
 
-    private var playerColor: PlayerColor = PlayerColor.White
+    private var playerColor: PieceColor = PieceColor.WHITE
 
     // 离屏缓存
     private var cacheBitmap: Bitmap? = null
@@ -65,7 +66,7 @@ class StrokeChessBoardView @JvmOverloads constructor(
         perCellDurationMs = ms.coerceAtLeast(1L)
     }
 
-    fun setPlayerColor(color: PlayerColor) {
+    fun setPlayerColor(color: PieceColor) {
         playerColor = color
         invalidateCache()
     }
@@ -146,7 +147,7 @@ class StrokeChessBoardView @JvmOverloads constructor(
         val cb = cacheCanvas ?: return
         cb.drawColor(0) // 清空
         // 考虑 playerColor 旋转
-        if (playerColor == PlayerColor.Black) {
+        if (playerColor == PieceColor.BLACK) {
             cb.save()
             cb.rotate(180f, width / 2f, height / 2f)
         }
@@ -167,7 +168,7 @@ class StrokeChessBoardView @JvmOverloads constructor(
         borderPaint.color = borderColor
         cb.drawRect(0f, 0f, width.toFloat(), height.toFloat(), borderPaint)
 
-        if (playerColor == PlayerColor.Black) {
+        if (playerColor == PieceColor.BLACK) {
             cb.restore()
         }
         cacheValid = true
@@ -188,7 +189,7 @@ class StrokeChessBoardView @JvmOverloads constructor(
         }
 
         // 动画进行中：按原逻辑逐格绘制（缓存已被标记为无效）
-        if (playerColor == PlayerColor.Black) {
+        if (playerColor == PieceColor.BLACK) {
             canvas.save()
             canvas.rotate(180f, width / 2f, height / 2f)
         }
@@ -208,7 +209,7 @@ class StrokeChessBoardView @JvmOverloads constructor(
         borderPaint.color = borderColor
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), borderPaint)
 
-        if (playerColor == PlayerColor.Black) {
+        if (playerColor == PieceColor.BLACK) {
             canvas.restore()
         }
     }

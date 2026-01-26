@@ -39,7 +39,6 @@ class ChessActivity : ComponentActivity() {
         setContent {
             val state by viewModel.state.collectAsState()
             ChessScreen(
-                application = this@ChessActivity.application,
                 state = state,
                 onBoardLayoutChanged = { x: Dp, y: Dp, width: Dp, height: Dp ->
                     Log.i(TAG, "x=$x, y=$y, width=$width, height=$height")
