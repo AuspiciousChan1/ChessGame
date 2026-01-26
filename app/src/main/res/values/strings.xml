@@ -5,4 +5,12 @@
     <string name="chess_board_description">Chess board</string>
     <string name="game_record">Game record</string>
     <string name="notation_empty_move">--</string>
+
+    <string name="activity_menu_label">MenuPage</string>
+    <string name="activity_menu_title">Chess</string>
+    <string name="activity_menu_item_edit_mode">Edit Mode</string>
+    <string name="activity_menu_item_single">Single Player</string>
+    <string name="activity_menu_item_two_player">Two Player</string>
+    <string name="activity_menu_item_settings">Setting</string>
+    <string name="activity_menu_item_about">About</string>
 </resources>

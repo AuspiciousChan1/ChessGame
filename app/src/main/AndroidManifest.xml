@@ -12,6 +12,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ChessGame">
         <activity
+            android:name=".pages.menu.MenuActivity"
+            android:exported="false"
+            android:label="@string/activity_menu_label"
+            android:theme="@style/Theme.ChessGame" />
+        <activity
             android:name=".pages.chess.ui.ChessActivity"
             android:exported="false"
             android:label="@string/title_activity_chess"
