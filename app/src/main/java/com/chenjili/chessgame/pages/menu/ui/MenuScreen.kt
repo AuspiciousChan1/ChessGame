@@ -1,4 +1,4 @@
-package com.chenjili.chessgame.pages.menu.ui.theme
+package com.chenjili.chessgame.pages.menu.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -21,6 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chenjili.chessgame.R
+import com.chenjili.chessgame.pages.menu.ui.theme.ChessGameTheme
 
 @Composable
 fun MenuScreen(state: MenuState, onIntent: (MenuIntent) -> Unit) {

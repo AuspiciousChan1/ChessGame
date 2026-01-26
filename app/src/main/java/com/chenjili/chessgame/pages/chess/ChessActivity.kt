@@ -1,4 +1,4 @@
-package com.chenjili.chessgame.pages.chess.ui
+package com.chenjili.chessgame.pages.chess
 
 import android.app.Activity
 import android.content.Intent
@@ -15,6 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import com.chenjili.chessgame.pages.chess.ui.ChessScreen
+import com.chenjili.chessgame.pages.chess.ui.ChessViewModel
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import kotlin.getValue
 

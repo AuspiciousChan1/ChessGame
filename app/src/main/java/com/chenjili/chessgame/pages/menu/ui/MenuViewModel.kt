@@ -1,17 +1,15 @@
-package com.chenjili.chessgame.pages.menu.ui.theme
+package com.chenjili.chessgame.pages.menu.ui
 
 import android.app.Activity
 import android.app.Application
-import androidx.core.view.ContentInfoCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.chenjili.chessgame.R
-import com.chenjili.chessgame.pages.chess.ui.ChessActivity
+import com.chenjili.chessgame.pages.chess.ChessActivity
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 
 enum class ItemRouteType {

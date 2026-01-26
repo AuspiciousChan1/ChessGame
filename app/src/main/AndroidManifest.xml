@@ -17,7 +17,7 @@
             android:label="@string/activity_menu_label"
             android:theme="@style/Theme.ChessGame" />
         <activity
-            android:name=".pages.chess.ui.ChessActivity"
+            android:name=".pages.chess.ChessActivity"
             android:exported="false"
             android:label="@string/title_activity_chess"
             android:theme="@style/Theme.ChessGame" />
