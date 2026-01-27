@@ -91,49 +91,6 @@ fun ChessScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top // 改为从顶部开始布局
                 ) {
-                    // 编辑区：棋子预览行
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 顺序：兵 马 象 车 后 王
-                        val topPieces = listOf(
-                            Pair("pawn", "pawn"),
-                            Pair("knight", "knight"),
-                            Pair("bishop", "bishop"),
-                            Pair("rook", "rook"),
-                            Pair("queen", "queen"),
-                            Pair("king", "king")
-                        )
-                        topPieces.forEachIndexed { _, (_, typeName) ->
-                            // 资源名与棋子渲染逻辑与棋盘内一致
-                            val resName = if(state.playerColor==PieceColor.WHITE) {
-                                "chess_piece_black_$typeName"
-                            } else {
-                                "chess_piece_white_$typeName"
-                            }
-                            val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
-                            if (resId != 0) {
-                                Image(
-                                    painter = painterResource(id = resId),
-                                    contentDescription = if(state.playerColor== PieceColor.WHITE)"black_$typeName" else "white_$typeName",
-                                    modifier = Modifier
-                                        .size(pieceSize)
-                                        .padding(horizontal = pieceSpacing / 2)
-                                        .clickable {
-                                            // 空的点击事件（按要求）
-                                        }
-                                )
-                            } else {
-                                // 占位（若资源缺失），用透明 Box 保持间距
-                                Box(modifier = Modifier.size(pieceSize))
-                            }
-                        }
-                    }
                     // 棋盘区
                     Box(
                         modifier = Modifier
@@ -257,48 +214,6 @@ fun ChessScreen(
                                     }
                                 }
                         )
-                    }
-                    // 编辑区：棋子预览行
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    )
-                    {
-                        // 顺序：兵 马 象 车 后 王
-                        val bottomPieces = listOf(
-                            Pair("pawn", "pawn"),
-                            Pair("knight", "knight"),
-                            Pair("bishop", "bishop"),
-                            Pair("rook", "rook"),
-                            Pair("queen", "queen"),
-                            Pair("king", "king")
-                        )
-                        bottomPieces.forEachIndexed { _, (_, typeName) ->
-                            val resName = if(state.playerColor==PieceColor.WHITE) {
-                                "chess_piece_white_$typeName"
-                            } else {
-                                "chess_piece_black_$typeName"
-                            }
-                            val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
-                            if (resId != 0) {
-                                Image(
-                                    painter = painterResource(id = resId),
-                                    contentDescription = if(state.playerColor==PieceColor.WHITE)"white_$typeName" else "black_$typeName",
-                                    modifier = Modifier
-                                        .size(pieceSize)
-                                        .padding(horizontal = pieceSpacing / 2)
-                                        .clickable {
-                                            // 空的点击事件（按要求）
-                                        }
-                                )
-                            } else {
-                                Box(modifier = Modifier.size(pieceSize))
-                            }
-                        }
                     }
                     // 功能区：如切换阵营
                     Row(

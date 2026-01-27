@@ -6,6 +6,7 @@
     <string name="chess_board_description">棋盘</string>
     <string name="game_record">棋谱</string>
     <string name="notation_empty_move">--</string>
+    <string name="clear_board">清空棋盘</string>
 
     <string name="activity_menu_label">目录页面</string>
     <string name="activity_menu_title">国际象棋</string>

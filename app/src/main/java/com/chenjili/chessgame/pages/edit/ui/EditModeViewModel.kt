@@ -1,11 +1,14 @@
 package com.chenjili.chessgame.pages.edit.ui
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.chenjili.chess.api.Piece
 import com.chenjili.chess.api.PieceColor
+import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.pages.chess.ui.ChessPieceDisplay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 enum class EditType {
     NONE,
@@ -26,11 +29,56 @@ sealed interface EditModeIntent {
     data class PlayerColorChanged(val newColor: PieceColor) : EditModeIntent
     data class BoardCellClicked(val column: Int, val row: Int, val playerColor: PieceColor): EditModeIntent
     data class PieceForEditClicked(val removeMode: Boolean, val piece: Piece?,): EditModeIntent
+    data class ClearBoard(val unused: Unit): EditModeIntent
 }
 
 class EditModeViewModel : ViewModel() {
     private val _state = MutableStateFlow(EditModeState())
     val state = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            val pieces = mutableListOf<ChessPieceDisplay>()
+            var pieceId = 0
+
+            // 白方底线 rank = 0
+            pieces += listOf(
+                ChessPieceDisplay(Piece(PieceType.ROOK, PieceColor.WHITE), 0, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KNIGHT, PieceColor.WHITE), 1, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.BISHOP, PieceColor.WHITE), 2, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.QUEEN, PieceColor.WHITE), 3, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KING, PieceColor.WHITE), 4, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.BISHOP, PieceColor.WHITE), 5, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KNIGHT, PieceColor.WHITE), 6, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.ROOK, PieceColor.WHITE), 7, 0, pieceId++)
+            )
+            // 白兵 rank = 1
+            for (f in 0..7) pieces += ChessPieceDisplay(Piece(PieceType.PAWN, PieceColor.WHITE), f, 1, pieceId++)
+
+            // 黑兵 rank = 6
+            for (f in 0..7) pieces += ChessPieceDisplay(Piece(PieceType.PAWN, PieceColor.BLACK), f, 6, pieceId++)
+            // 黑方底线 rank = 7
+            pieces += listOf(
+                ChessPieceDisplay(Piece(PieceType.ROOK, PieceColor.BLACK), 0, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KNIGHT, PieceColor.BLACK), 1, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.BISHOP, PieceColor.BLACK), 2, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.QUEEN, PieceColor.BLACK), 3, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KING, PieceColor.BLACK), 4, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.BISHOP, PieceColor.BLACK), 5, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KNIGHT, PieceColor.BLACK), 6, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.ROOK, PieceColor.BLACK), 7, 7, pieceId++)
+            )
+
+            // 初始化棋盘为空
+            _state.value = EditModeState(
+                playerColor = PieceColor.WHITE,
+                pieces = pieces,
+                selectedCell = null,
+                selectedPiece = null,
+                editType = EditType.NONE,
+            )
+        }
+    }
 
     fun processIntent(intent: EditModeIntent) {
         when (intent) {
@@ -44,6 +92,9 @@ class EditModeViewModel : ViewModel() {
             }
             is EditModeIntent.PieceForEditClicked -> {
                 handlePieceForEditClicked(intent.removeMode, intent.piece)
+            }
+            is EditModeIntent.ClearBoard -> {
+                handleClearBoardClicked()
             }
         }
     }
@@ -119,6 +170,16 @@ class EditModeViewModel : ViewModel() {
     // 处理用于编辑局面的棋子被点击事件
     private fun handlePieceForEditClicked(removeMode: Boolean, piece: Piece?) {
         select(removeMode, piece, null, null)
+    }
+
+    private fun handleClearBoardClicked() {
+        val currentState = _state.value
+        _state.value = currentState.copy(
+            pieces = emptyList(),
+            selectedCell = null,
+            selectedPiece = null,
+            editType = EditType.NONE,
+        )
     }
 
     private fun select(removeMode: Boolean, piece: Piece?, cellColumn: Int?, cellRow: Int?) {

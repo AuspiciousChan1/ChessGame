@@ -236,6 +236,13 @@ fun EditModeScreen(
                         ) {
                             Text(text = stringResource(id = R.string.switch_side))
                         }
+                        Button(
+                            onClick = {
+                                onIntent(EditModeIntent.ClearBoard(Unit))
+                            }
+                        ) {
+                            Text(text = stringResource(id = R.string.clear_board))
+                        }
                     }
                 }
             }
