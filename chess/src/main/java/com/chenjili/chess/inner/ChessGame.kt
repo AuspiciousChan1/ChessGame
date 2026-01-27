@@ -2,6 +2,7 @@ package com.chenjili.chess.inner
 
 import com.chenjili.chess.api.*
 import java.util.UUID
+import kotlin.collections.get
 import kotlin.div
 import kotlin.inc
 import kotlin.text.compareTo
@@ -421,6 +422,28 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         return moves.filter { move ->
             !leavesKingInCheck(move)
         }
+    }
+
+    override fun isInCheck(color: PieceColor): Boolean {
+        // 1) 找到指定颜色的王
+        var kingPos: Position? = null
+        for (rank in 0..7) {
+            for (file in 0..7) {
+                val piece = board[rank][file]
+                if (piece != null && piece.type == PieceType.KING && piece.color == color) {
+                    kingPos = Position(file, rank)
+                    break
+                }
+            }
+            if (kingPos != null) break
+        }
+
+        // 2) 王不存在则视为异常局面：认为在将军中（与 leavesKingInCheck 的处理一致）
+        if (kingPos == null) return true
+
+        // 3) 判断该王格是否被对方攻击
+        val opponent = if (color == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
+        return isSquareAttacked(kingPos, opponent)
     }
     
     private fun generateMovesForPiece(from: Position, piece: Piece, moves: MutableList<Move>) {

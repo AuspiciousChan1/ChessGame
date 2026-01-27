@@ -108,13 +108,11 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * 生成移动的标准棋谱表示
-     * @param piece 被移动的棋子
-     * @param playerColor 当前玩家颜色
-     * @param from 起始位置 (column, row)
-     * @param to 目标位置 (column, row)
+     * @param move 棋子移动信息
+     * @param isInCheck 移动后对方是否被将军
      * @return 棋谱字符串，例如 "Nb1-c3"
      */
-    private fun getMoveNotation(move: Move): String {
+    private fun getMoveNotation(move: Move, isInCheck: Boolean): String {
         if (move.isCastling) {
             return if (move.to.file > move.from.file) "O-O" else "O-O-O"
         }
@@ -132,7 +130,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         }
         else {
             ""
-        }
+        } + if (isInCheck) "+" else ""
         return "$peaceTypeNotation$fromFileStr$fromRankStr$bridge$toFileStr$toRankStr$suf"
     }
 
@@ -228,7 +226,10 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                     _state.value = currentState.copy(selectedCell = null)
                     return
                 }
-                val moveNotation = getMoveNotation(move)
+                val isInCheck = chessGame.isInCheck(
+                    if (move.piece.color == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
+                )
+                val moveNotation = getMoveNotation(move, isInCheck)
 
                 val newMove = ChessMove(
                     move = move,
