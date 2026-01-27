@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -38,6 +39,7 @@ import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.edit.ui.theme.ChessGameTheme
+import kotlinx.coroutines.selects.select
 
 @Composable
 fun EditModeScreen(
@@ -82,10 +84,18 @@ fun EditModeScreen(
                         .fillMaxWidth()
                         .padding(10.dp))
                     {
+                        val selectedId: Int = if (state.selectedPiece != null && state.selectedCell == null) {
+                            state.selectedPiece.getDrawableId()
+                        } else if (state.selectedPiece == null && state.selectedCell == null && state.editType == EditType.REMOVE) {
+                            R.drawable.remove_piece
+                        }else {
+                            0
+                        }
                         PiecesForEdit(
                             pieceColor = if(state.playerColor==PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE,
                             pieceSize = pieceSize,
                             pieceSpacing = pieceSpacing,
+                            selectedId = selectedId,
                             onIntent = onIntent
                         )
                     }
@@ -193,10 +203,18 @@ fun EditModeScreen(
                         .fillMaxWidth()
                         .padding(10.dp))
                     {
+                        val selectedId: Int = if (state.selectedPiece != null && state.selectedCell == null) {
+                            state.selectedPiece.getDrawableId()
+                        } else if (state.selectedPiece == null && state.selectedCell == null && state.editType == EditType.REMOVE) {
+                            R.drawable.remove_piece
+                        }else {
+                            0
+                        }
                         PiecesForEdit(
                             pieceColor = if(state.playerColor==PieceColor.WHITE) PieceColor.WHITE else PieceColor.BLACK,
                             pieceSize = pieceSize,
                             pieceSpacing = pieceSpacing,
+                            selectedId = selectedId,
                             onIntent = onIntent
                         )
                     }
@@ -226,7 +244,7 @@ fun EditModeScreen(
 }
 
 @Composable
-fun PiecesForEdit(pieceColor: PieceColor, pieceSize: Dp, pieceSpacing: Dp, onIntent: (EditModeIntent) -> Unit = { }) {
+fun PiecesForEdit(pieceColor: PieceColor, pieceSize: Dp, pieceSpacing: Dp, selectedId: Int, onIntent: (EditModeIntent) -> Unit = { }) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
@@ -251,6 +269,7 @@ fun PiecesForEdit(pieceColor: PieceColor, pieceSize: Dp, pieceSpacing: Dp, onInt
                     modifier = Modifier
                         .size(pieceSize)
                         .padding(horizontal = pieceSpacing / 2)
+                        .background(if (resId == selectedId) colorResource(R.color.chess_piece_selected_cell_overlay_color) else Color( 0x00000000))
                         .clickable {
                             onIntent(
                                 EditModeIntent.PieceForEditClicked(piece==null, piece)
