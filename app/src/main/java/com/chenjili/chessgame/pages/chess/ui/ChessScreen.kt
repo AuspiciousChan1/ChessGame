@@ -70,8 +70,6 @@ fun ChessScreen(
                 val density = LocalDensity.current
                 val context = LocalContext.current
                 val initialTopOffset = remember { (maxH - squareSize) / 2f }
-                val pieceSize = squareSize / 10f
-                val pieceSpacing = 8.dp
 
                 // 背景图
                 Image(
@@ -256,7 +254,7 @@ fun ChessScreen(
                                 var whiteCache: String = ""
                                 for (move in moves) {
                                     val notation = move.notation
-                                    val pieceColor = move.pieceColor
+                                    val pieceColor = move.move.piece.color
                                     when(pieceColor) {
                                         PieceColor.WHITE -> {
                                             if (whiteCache.isNotEmpty()) {
