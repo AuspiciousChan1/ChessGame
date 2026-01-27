@@ -25,6 +25,7 @@ data class ChessPieceDisplay (
 
 data class ChessMove(
     val move: Move,
+    val playerColor: PieceColor,
     val notation: String // e.g., "Nb1-c3"
 )
 
@@ -93,15 +94,6 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    // Helper function to convert column and row to chess notation
-    private fun positionToNotation(column: Int, row: Int, playerColor: PieceColor): String {
-        val transformedColumn = if (playerColor == PieceColor.WHITE) column else 7 - column
-        val transformedRow = if (playerColor == PieceColor.WHITE) row else 7 - row
-        val file = ('a' + transformedColumn).toString()
-        val rank = (transformedRow + 1).toString()
-        return "$file$rank"
-    }
-
     // Helper function to get piece notation prefix
     private fun getPieceNotation(pieceType: PieceType): String {
         return when (pieceType) {
@@ -117,15 +109,31 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * 生成移动的标准棋谱表示
      * @param piece 被移动的棋子
+     * @param playerColor 当前玩家颜色
      * @param from 起始位置 (column, row)
      * @param to 目标位置 (column, row)
      * @return 棋谱字符串，例如 "Nb1-c3"
      */
-    private fun getMoveNotation(piece: Piece, from: Pair<Int, Int>, to: Pair<Int, Int>): String {
-        val fromNotation = positionToNotation(from.first, from.second, piece.color)
-        val toNotation = positionToNotation(to.first, to.second, piece.color)
-        val pieceNotation = getPieceNotation(piece.type)
-        return "$pieceNotation$fromNotation-$toNotation"
+    private fun getMoveNotation(move: Move): String {
+        if (move.isCastling) {
+            return if (move.to.file > move.from.file) "O-O" else "O-O-O"
+        }
+        val fromFileStr = ('a' + move.from.file).toString()
+        val fromRankStr = (move.from.rank + 1).toString()
+        val toFileStr = ('a' + move.to.file).toString()
+        val toRankStr = (move.to.rank + 1).toString()
+        val peaceTypeNotation = getPieceNotation(move.piece.type)
+        val bridge = if (move.capturedPiece != null || move.isEnPassant) "x" else "-"
+        val suf = if (move.promotionPiece != null) {
+            val promotionStr = getPieceNotation(move.promotionPiece!!)
+            "=$promotionStr"
+        } else if (move.isEnPassant) {
+            " e.p."
+        }
+        else {
+            ""
+        }
+        return "$peaceTypeNotation$fromFileStr$fromRankStr$bridge$toFileStr$toRankStr$suf"
     }
 
     // MVI: 处理Intent的唯一入口
@@ -220,10 +228,11 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                     _state.value = currentState.copy(selectedCell = null)
                     return
                 }
-                val moveNotation = getMoveNotation(selectedPiece.piece, selectedCol to selectedRow, column to row)
+                val moveNotation = getMoveNotation(move)
 
                 val newMove = ChessMove(
                     move = move,
+                    playerColor = playerColor,
                     notation = moveNotation
                 )
 
