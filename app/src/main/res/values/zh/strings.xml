@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">国际象棋</string>
-    <string name="title_activity_chess">国际象棋页面</string>
-    <string name="switch_side">切换方位</string>
-    <string name="chess_board_description">棋盘</string>
-    <string name="game_record">棋谱</string>
-    <string name="notation_empty_move">--</string>
-</resources>

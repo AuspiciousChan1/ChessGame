@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="120dp"
+    android:viewportWidth="320"
+    android:viewportHeight="120">
+
+    <!-- 更亮的宣纸底（避免发黑） -->
+    <path
+        android:fillColor="#FBF4E6"
+        android:pathData="M0,0 H320 V120 H0 Z" />
+
+    <!-- 内框（淡金边） -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#D9C7A7"
+        android:strokeWidth="2"
+        android:alpha="0.75"
+        android:pathData="M6,6 H314 V114 H6 Z" />
+
+    <!-- 纸纹（更浅） -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#EDE2CC"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:alpha="0.45"
+        android:pathData="M14,32 C62,20 110,40 162,28 C210,18 258,26 306,22" />
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#EFE6D3"
+        android:strokeWidth="1.4"
+        android:strokeLineCap="round"
+        android:alpha="0.38"
+        android:pathData="M12,88 C70,74 120,96 176,82 C226,70 268,78 308,74" />
+
+</vector>

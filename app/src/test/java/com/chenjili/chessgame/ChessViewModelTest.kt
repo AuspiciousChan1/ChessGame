@@ -1,11 +1,7 @@
 package com.chenjili.chessgame
 
-import com.chenjili.chessgame.pages.chess.ui.ChessIntent
-import com.chenjili.chessgame.pages.chess.ui.ChessViewModel
-import com.chenjili.chessgame.pages.chess.ui.PieceType
-import com.chenjili.chessgame.pages.chess.ui.PlayerColor
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.Assert.*
 
 /**
  * Unit tests for ChessViewModel piece selection and movement logic.

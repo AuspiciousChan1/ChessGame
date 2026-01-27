@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="360dp"
+    android:height="640dp"
+    android:viewportWidth="360"
+    android:viewportHeight="640">
+
+    <!-- 1) 更亮的胡桃木纸面底色 -->
+    <path
+        android:fillColor="#8B6A54"
+        android:pathData="M0,0 H360 V640 H0 Z" />
+
+    <!-- 2) 竖向木板：用更浅的明暗分块拉开对比 -->
+    <path android:fillColor="#9B7860" android:alpha="0.95" android:pathData="M0,0 H52 V640 H0 Z"/>
+    <path android:fillColor="#835D49" android:alpha="0.90" android:pathData="M52,0 H104 V640 H52 Z"/>
+    <path android:fillColor="#A77F66" android:alpha="0.92" android:pathData="M104,0 H156 V640 H104 Z"/>
+    <path android:fillColor="#7B5543" android:alpha="0.88" android:pathData="M156,0 H208 V640 H156 Z"/>
+    <path android:fillColor="#B0866C" android:alpha="0.92" android:pathData="M208,0 H260 V640 H208 Z"/>
+    <path android:fillColor="#845F4B" android:alpha="0.89" android:pathData="M260,0 H304 V640 H260 Z"/>
+    <path android:fillColor="#A17862" android:alpha="0.92" android:pathData="M304,0 H360 V640 H304 Z"/>
+
+    <!-- 3) 顶部暖光：更亮一点，让整体不压黑 -->
+    <path
+        android:fillColor="#FFD9AE"
+        android:alpha="0.22"
+        android:pathData="M0,0 H360 V210 H0 Z" />
+    <path
+        android:fillColor="#FFC98A"
+        android:alpha="0.16"
+        android:pathData="M30,34 C96,-10 174,-10 240,34 C174,92 96,92 30,34 Z" />
+    <path
+        android:fillColor="#FFF1DA"
+        android:alpha="0.10"
+        android:pathData="M52,66 C112,30 154,30 214,66 C154,104 112,104 52,66 Z" />
+
+    <!-- 4) 木纹：改成更浅的线条，且 alpha 降低，避免脏黑 -->
+    <path
+        android:strokeColor="#3A241B"
+        android:strokeWidth="3"
+        android:alpha="0.10"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M18,96 C44,126 40,196 22,268" />
+    <path
+        android:strokeColor="#3A241B"
+        android:strokeWidth="2.5"
+        android:alpha="0.09"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M90,78 C122,130 130,220 98,304" />
+    <path
+        android:strokeColor="#3A241B"
+        android:strokeWidth="2.5"
+        android:alpha="0.08"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M230,140 C252,178 274,244 244,324" />
+    <path
+        android:strokeColor="#3A241B"
+        android:strokeWidth="2.5"
+        android:alpha="0.07"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M322,58 C338,128 346,202 330,280" />
+
+    <!-- 5) 拉高整体层次：加入更明显的浅色高光带 -->
+    <path
+        android:strokeColor="#E7D2BE"
+        android:strokeWidth="6"
+        android:alpha="0.12"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M10,170 C88,192 186,192 250,168" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:alpha="0.08"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M14,198 C92,220 188,220 254,196" />
+
+    <!-- 6) 右侧书架：改成更浅棕，透明度更低（不再压黑） -->
+    <path
+        android:fillColor="#5D4033"
+        android:alpha="0.40"
+        android:pathData="M252,120 H356 V570 H252 Z" />
+    <path
+        android:fillColor="#6A4B3C"
+        android:alpha="0.32"
+        android:pathData="M256,150 H352 V162 H256 Z" />
+    <path
+        android:fillColor="#6A4B3C"
+        android:alpha="0.32"
+        android:pathData="M256,205 H352 V217 H256 Z" />
+    <path
+        android:fillColor="#6A4B3C"
+        android:alpha="0.32"
+        android:pathData="M256,260 H352 V272 H256 Z" />
+    <path
+        android:fillColor="#6A4B3C"
+        android:alpha="0.32"
+        android:pathData="M256,315 H352 V327 H256 Z" />
+    <path
+        android:fillColor="#6A4B3C"
+        android:alpha="0.32"
+        android:pathData="M256,370 H352 V382 H256 Z" />
+    <path
+        android:fillColor="#6A4B3C"
+        android:alpha="0.32"
+        android:pathData="M256,425 H352 V437 H256 Z" />
+    <path
+        android:fillColor="#6A4B3C"
+        android:alpha="0.32"
+        android:pathData="M256,480 H352 V492 H256 Z" />
+
+    <!-- 书架边缘高光：更亮 -->
+    <path
+        android:strokeColor="#F2E1D2"
+        android:strokeWidth="2"
+        android:alpha="0.16"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M254,122 V568" />
+
+    <!-- 7) 移除黑色暗角（之前会把整体再压一层黑） -->
+</vector>

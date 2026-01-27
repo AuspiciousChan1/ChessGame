@@ -3,23 +3,16 @@ package com.chenjili.chessgame.pages.chess.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.chenjili.chess.api.Piece
+import com.chenjili.chess.api.PieceColor
+import com.chenjili.chess.api.PieceType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class PlayerColor {
-    White,
-    Black
-}
-
-enum class PieceType{
-    KING, QUEEN, ROOK, BISHOP, KNIGHT, PAWN
-}
-
-data class ChessPieceDisplay(
-    val type: PieceType,
-    val color: PlayerColor,
+data class ChessPieceDisplay (
+    val piece: Piece,
     val column: Int, // 0..7 白方对应a-h；黑方对应h-a
     val row: Int,  // 0..7 白方对应1-8；黑方对应8-1
     val id: Int // Unique identifier for animation tracking
@@ -31,20 +24,20 @@ data class ChessMove(
     val fromRow: Int,
     val toColumn: Int,
     val toRow: Int,
-    val pieceColor: PlayerColor,
+    val pieceColor: PieceColor,
     val notation: String // e.g., "Nb1-c3"
 )
 
 // MVI: Intent - 表示用户的所有可能操作
 sealed interface ChessIntent {
-    data class PlayerColorChanged(val newColor: PlayerColor) : ChessIntent
-    data class BoardCellClicked(val column: Int, val row: Int, val playerColor: PlayerColor) : ChessIntent
+    data class PlayerColorChanged(val newColor: PieceColor) : ChessIntent
+    data class BoardCellClicked(val column: Int, val row: Int, val playerColor: PieceColor) : ChessIntent
 }
 
 // MVI: State - 表示整个UI状态
 data class ChessState(
     val pieces: List<ChessPieceDisplay> = emptyList(),
-    val playerColor: PlayerColor = PlayerColor.White,
+    val playerColor: PieceColor = PieceColor.WHITE,
     val selectedCell: Pair<Int, Int>? = null, // (column, row) of the selected cell
     val moveHistory: List<ChessMove> = emptyList() // History of all moves
 )
@@ -61,42 +54,42 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             
             // 白方底线 rank = 0
             initialPieces += listOf(
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.White, 0, 0, pieceId++),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.White, 1, 0, pieceId++),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.White, 2, 0, pieceId++),
-                ChessPieceDisplay(PieceType.QUEEN, PlayerColor.White, 3, 0, pieceId++),
-                ChessPieceDisplay(PieceType.KING, PlayerColor.White, 4, 0, pieceId++),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.White, 5, 0, pieceId++),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.White, 6, 0, pieceId++),
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.White, 7, 0, pieceId++)
+                ChessPieceDisplay(Piece(PieceType.ROOK, PieceColor.WHITE), 0, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KNIGHT, PieceColor.WHITE), 1, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.BISHOP, PieceColor.WHITE), 2, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.QUEEN, PieceColor.WHITE), 3, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KING, PieceColor.WHITE), 4, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.BISHOP, PieceColor.WHITE), 5, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KNIGHT, PieceColor.WHITE), 6, 0, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.ROOK, PieceColor.WHITE), 7, 0, pieceId++)
             )
             // 白兵 rank = 1
-            for (f in 0..7) initialPieces += ChessPieceDisplay(PieceType.PAWN, PlayerColor.White, f, 1, pieceId++)
+            for (f in 0..7) initialPieces += ChessPieceDisplay(Piece(PieceType.PAWN, PieceColor.WHITE), f, 1, pieceId++)
 
             // 黑兵 rank = 6
-            for (f in 0..7) initialPieces += ChessPieceDisplay(PieceType.PAWN, PlayerColor.Black, f, 6, pieceId++)
+            for (f in 0..7) initialPieces += ChessPieceDisplay(Piece(PieceType.PAWN, PieceColor.BLACK), f, 6, pieceId++)
             // 黑方底线 rank = 7
             initialPieces += listOf(
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.Black, 0, 7, pieceId++),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.Black, 1, 7, pieceId++),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.Black, 2, 7, pieceId++),
-                ChessPieceDisplay(PieceType.QUEEN, PlayerColor.Black, 3, 7, pieceId++),
-                ChessPieceDisplay(PieceType.KING, PlayerColor.Black, 4, 7, pieceId++),
-                ChessPieceDisplay(PieceType.BISHOP, PlayerColor.Black, 5, 7, pieceId++),
-                ChessPieceDisplay(PieceType.KNIGHT, PlayerColor.Black, 6, 7, pieceId++),
-                ChessPieceDisplay(PieceType.ROOK, PlayerColor.Black, 7, 7, pieceId++)
+                ChessPieceDisplay(Piece(PieceType.ROOK, PieceColor.BLACK), 0, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KNIGHT, PieceColor.BLACK), 1, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.BISHOP, PieceColor.BLACK), 2, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.QUEEN, PieceColor.BLACK), 3, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KING, PieceColor.BLACK), 4, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.BISHOP, PieceColor.BLACK), 5, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.KNIGHT, PieceColor.BLACK), 6, 7, pieceId++),
+                ChessPieceDisplay(Piece(PieceType.ROOK, PieceColor.BLACK), 7, 7, pieceId++)
             )
             _state.value = ChessState(
                 pieces = initialPieces,
-                playerColor = PlayerColor.White
+                playerColor = PieceColor.WHITE
             )
         }
     }
 
     // Helper function to convert column and row to chess notation
-    private fun positionToNotation(column: Int, row: Int, playerColor: PlayerColor): String {
-        val transformedColumn = if (playerColor == PlayerColor.White) column else 7 - column
-        val transformedRow = if (playerColor == PlayerColor.White) row else 7 - row
+    private fun positionToNotation(column: Int, row: Int, playerColor: PieceColor): String {
+        val transformedColumn = if (playerColor == PieceColor.WHITE) column else 7 - column
+        val transformedRow = if (playerColor == PieceColor.WHITE) row else 7 - row
         val file = ('a' + transformedColumn).toString()
         val rank = (transformedRow + 1).toString()
         return "$file$rank"
@@ -122,7 +115,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun handlePlayerColorChanged(newColor: PlayerColor) {
+    private fun handlePlayerColorChanged(newColor: PieceColor) {
         val currentState = _state.value
         val updatedPieces = currentState.pieces.map { piece ->
             piece.copy(
@@ -183,16 +176,16 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                     // Create move notation
                     val fromNotation = positionToNotation(selectedCol, selectedRow, playerColor)
                     val toNotation = positionToNotation(column, row, playerColor)
-                    val pieceNotation = getPieceNotation(selectedPiece.type)
+                    val pieceNotation = getPieceNotation(selectedPiece.piece.type)
                     val moveNotation = "$pieceNotation$fromNotation-$toNotation"
                     
                     val newMove = ChessMove(
-                        pieceType = selectedPiece.type,
+                        pieceType = selectedPiece.piece.type,
                         fromColumn = selectedCol,
                         fromRow = selectedRow,
                         toColumn = column,
                         toRow = row,
-                        pieceColor = selectedPiece.color,
+                        pieceColor = selectedPiece.piece.color,
                         notation = moveNotation
                     )
                     

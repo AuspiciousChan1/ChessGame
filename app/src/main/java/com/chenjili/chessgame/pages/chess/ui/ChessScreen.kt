@@ -1,12 +1,11 @@
-// kotlin
 package com.chenjili.chessgame.pages.chess.ui
 
-import android.app.Application
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,25 +34,24 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.chenjili.chess.api.PieceColor
+import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import java.util.ArrayList
-import kotlin.div
-
-// Constants for UI
-private val SelectedCellOverlayColor = Color(0x8000FF00) // Semi-transparent light green
 
 @Composable
 fun ChessScreen(
-    application: Application,
     paddingDp: Dp = 8.dp,
     state: ChessState = ChessState(),
     onBoardLayoutChanged: (x: Dp, y: Dp, width: Dp, height: Dp) -> Unit = { _, _, _, _ -> },
@@ -72,6 +70,18 @@ fun ChessScreen(
                 val density = LocalDensity.current
                 val context = LocalContext.current
                 val initialTopOffset = remember { (maxH - squareSize) / 2f }
+                val pieceSize = squareSize / 10f
+                val pieceSpacing = 8.dp
+
+                // 背景图
+                Image(
+                    painter = painterResource(id = R.drawable.bg_scholar_style),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .matchParentSize()      // 占满 BoxWithConstraints 的可用区域，作为背景
+                        .align(Alignment.Center),
+                    contentScale = ContentScale.Crop // 根据需要改为 Fit / FillBounds 等
+                )
 
                 Column(
                     modifier = Modifier
@@ -81,6 +91,50 @@ fun ChessScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top // 改为从顶部开始布局
                 ) {
+                    // 编辑区：棋子预览行
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 顺序：兵 马 象 车 后 王
+                        val topPieces = listOf(
+                            Pair("pawn", "pawn"),
+                            Pair("knight", "knight"),
+                            Pair("bishop", "bishop"),
+                            Pair("rook", "rook"),
+                            Pair("queen", "queen"),
+                            Pair("king", "king")
+                        )
+                        topPieces.forEachIndexed { _, (_, typeName) ->
+                            // 资源名与棋子渲染逻辑与棋盘内一致
+                            val resName = if(state.playerColor==PieceColor.WHITE) {
+                                "chess_piece_black_$typeName"
+                            } else {
+                                "chess_piece_white_$typeName"
+                            }
+                            val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
+                            if (resId != 0) {
+                                Image(
+                                    painter = painterResource(id = resId),
+                                    contentDescription = if(state.playerColor== PieceColor.WHITE)"black_$typeName" else "white_$typeName",
+                                    modifier = Modifier
+                                        .size(pieceSize)
+                                        .padding(horizontal = pieceSpacing / 2)
+                                        .clickable {
+                                            // 空的点击事件（按要求）
+                                        }
+                                )
+                            } else {
+                                // 占位（若资源缺失），用透明 Box 保持间距
+                                Box(modifier = Modifier.size(pieceSize))
+                            }
+                        }
+                    }
+                    // 棋盘区
                     Box(
                         modifier = Modifier
                             .size(squareSize)
@@ -95,7 +149,8 @@ fun ChessScreen(
                                     onBoardLayoutChanged(xDp, yDp, widthDp, heightDp)
                                 }
                             }
-                    ) {
+                    )
+                    {
                         // 棋盘背景图
                         Image(
                             painter = painterResource(id = R.drawable.chess_board_default),
@@ -103,32 +158,17 @@ fun ChessScreen(
                             modifier = Modifier
                                 .size(squareSize)
                                 .align(Alignment.TopStart)
-                                .rotate(if (state.playerColor == PlayerColor.Black) 180f else 0f)
+                                .rotate(if (state.playerColor == PieceColor.BLACK) 180f else 0f)
                         )
-//                    // 使用自定义 View 作为棋盘背景
-//                    AndroidView(
-//                        modifier = Modifier
-//                            .size(squareSize)
-//                            .align(Alignment.TopStart),
-//                        factory = { ctx ->
-//                            StrokeChessBoardView(ctx).apply {
-//                                setPlayerColor(playerColor)
-//                                startDraw() // 可根据需要移除或控制
-//                            }
-//                        },
-//                        update = { view ->
-//                            view.setPlayerColor(playerColor)
-//                        }
-//                    )
                         // 计算格子与棋子尺寸
                         val cellDp = squareSize / 8f
                         val pieceDp = cellDp * 0.8f
                         val pieceOffsetInner = (cellDp - pieceDp) / 2f
 
-                        state.pieces.sortedBy { it.id }.forEach { piece ->
-                            key(piece.id) {
-                                val targetX = (cellDp * piece.column) + pieceOffsetInner
-                                val targetY = (cellDp * (7 - piece.row)) + pieceOffsetInner
+                        state.pieces.sortedBy { it.id }.forEach { pieceDisplay ->
+                            key(pieceDisplay.id) {
+                                val targetX = (cellDp * pieceDisplay.column) + pieceOffsetInner
+                                val targetY = (cellDp * (7 - pieceDisplay.row)) + pieceOffsetInner
 
                                 // Animate the position with spring animation
                                 val animatedX by animateDpAsState(
@@ -137,7 +177,7 @@ fun ChessScreen(
                                         dampingRatio = Spring.DampingRatioMediumBouncy,
                                         stiffness = Spring.StiffnessMedium
                                     ),
-                                    label = "pieceX_${piece.id}"
+                                    label = "pieceX_${pieceDisplay.id}"
                                 )
 
                                 val animatedY by animateDpAsState(
@@ -146,10 +186,10 @@ fun ChessScreen(
                                         dampingRatio = Spring.DampingRatioMediumBouncy,
                                         stiffness = Spring.StiffnessMedium
                                     ),
-                                    label = "pieceY_${piece.id}"
+                                    label = "pieceY_${pieceDisplay.id}"
                                 )
 
-                                val typeName = when (piece.type) {
+                                val typeName = when (pieceDisplay.piece.type) {
                                     PieceType.KING -> "king"
                                     PieceType.QUEEN -> "queen"
                                     PieceType.ROOK -> "rook"
@@ -157,7 +197,7 @@ fun ChessScreen(
                                     PieceType.KNIGHT -> "knight"
                                     PieceType.PAWN -> "pawn"
                                 }
-                                val colorName = if (piece.color == PlayerColor.White) "white" else "black"
+                                val colorName = if (pieceDisplay.piece.color == PieceColor.WHITE) "white" else "black"
                                 val resName = "chess_piece_${colorName}_$typeName"
                                 val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
 
@@ -178,13 +218,13 @@ fun ChessScreen(
                         state.selectedCell?.let { (selectedColumn, selectedRow) ->
                             val overlayX = cellDp * selectedColumn
                             val overlayY = cellDp * (7 - selectedRow)
-                            
+
                             Box(
                                 modifier = Modifier
                                     .size(cellDp)
                                     .align(Alignment.TopStart)
                                     .offset(x = overlayX, y = overlayY)
-                                    .background(SelectedCellOverlayColor)
+                                    .background(colorResource(R.color.chess_piece_selected_cell_overlay_color))
                             )
                         }
 
@@ -192,7 +232,7 @@ fun ChessScreen(
                         val boardSizePx = with(LocalDensity.current) { squareSize.toPx() }
                         val cellSizePx = boardSizePx / 8f
 
-                        androidx.compose.foundation.layout.Box(
+                        Box(
                             modifier = Modifier
                                 .matchParentSize()
                                 .pointerInput(state.playerColor, boardSizePx) {
@@ -204,8 +244,8 @@ fun ChessScreen(
                                         val rowFromTop = (y / cellSizePx).toInt().coerceIn(0, 7)
 
                                         // 你的绘制：y = cell * (7 - row)，所以 row = 7 - rowFromTop
-                                        var column = colFromLeft
-                                        var row = 7 - rowFromTop
+                                        val column = colFromLeft
+                                        val row = 7 - rowFromTop
 
                                         onIntent(
                                             ChessIntent.BoardCellClicked(
@@ -218,25 +258,69 @@ fun ChessScreen(
                                 }
                         )
                     }
+                    // 编辑区：棋子预览行
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    )
+                    {
+                        // 顺序：兵 马 象 车 后 王
+                        val bottomPieces = listOf(
+                            Pair("pawn", "pawn"),
+                            Pair("knight", "knight"),
+                            Pair("bishop", "bishop"),
+                            Pair("rook", "rook"),
+                            Pair("queen", "queen"),
+                            Pair("king", "king")
+                        )
+                        bottomPieces.forEachIndexed { _, (_, typeName) ->
+                            val resName = if(state.playerColor==PieceColor.WHITE) {
+                                "chess_piece_white_$typeName"
+                            } else {
+                                "chess_piece_black_$typeName"
+                            }
+                            val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
+                            if (resId != 0) {
+                                Image(
+                                    painter = painterResource(id = resId),
+                                    contentDescription = if(state.playerColor==PieceColor.WHITE)"white_$typeName" else "black_$typeName",
+                                    modifier = Modifier
+                                        .size(pieceSize)
+                                        .padding(horizontal = pieceSpacing / 2)
+                                        .clickable {
+                                            // 空的点击事件（按要求）
+                                        }
+                                )
+                            } else {
+                                Box(modifier = Modifier.size(pieceSize))
+                            }
+                        }
+                    }
+                    // 功能区：如切换阵营
                     Row(
                         modifier = Modifier
                             .size(squareSize, 48.dp)
                             .padding(top = 12.dp),
                         horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    )
+                    {
                         Button(
                             onClick = {
                                 val newColor =
-                                    if (state.playerColor == PlayerColor.White) PlayerColor.Black else PlayerColor.White
+                                    if (state.playerColor == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
                                 onIntent(ChessIntent.PlayerColorChanged(newColor))
                             }
                         ) {
                             Text(text = stringResource(id = R.string.switch_side))
                         }
                     }
-                    
-                    // Chess move history section
+
+                    // 棋谱区
                     if (state.moveHistory.isNotEmpty()) {
                         Column(
                             modifier = Modifier
@@ -259,7 +343,7 @@ fun ChessScreen(
                                     val notation = move.notation
                                     val pieceColor = move.pieceColor
                                     when(pieceColor) {
-                                        PlayerColor.White -> {
+                                        PieceColor.WHITE -> {
                                             if (whiteCache.isNotEmpty()) {
                                                 // 上一步白棋未配对，补全黑棋为 "--"
                                                 triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
@@ -268,7 +352,7 @@ fun ChessScreen(
                                             // 记录当前的白棋走子
                                             whiteCache = notation
                                         }
-                                        PlayerColor.Black -> {
+                                        PieceColor.BLACK -> {
                                             val whiteNotation = if (whiteCache.isNotEmpty()) whiteCache else notationEmptyMove
                                             triples.add(Triple(moveNum, whiteNotation, notation))
                                             whiteCache = ""

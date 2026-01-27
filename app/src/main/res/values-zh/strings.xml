@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">国际象棋</string>
+    <string name="title_activity_chess">国际象棋页面</string>
+    <string name="switch_side">切换方位</string>
+    <string name="chess_board_description">棋盘</string>
+    <string name="game_record">棋谱</string>
+    <string name="notation_empty_move">--</string>
+
+    <string name="activity_menu_label">目录页面</string>
+    <string name="activity_menu_title">国际象棋</string>
+    <string name="activity_menu_item_edit_mode">编辑模式</string>
+    <string name="activity_menu_item_single">单人游戏</string>
+    <string name="activity_menu_item_two_player">双人对战</string>
+    <string name="activity_menu_item_settings">游戏设置</string>
+    <string name="activity_menu_item_about">关于我们</string>
+</resources>
