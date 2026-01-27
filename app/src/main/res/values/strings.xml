@@ -13,4 +13,5 @@
     <string name="activity_menu_item_two_player">Two Player</string>
     <string name="activity_menu_item_settings">Setting</string>
     <string name="activity_menu_item_about">About</string>
+    <string name="title_activity_edit_mode">EditModeActivity</string>
 </resources>

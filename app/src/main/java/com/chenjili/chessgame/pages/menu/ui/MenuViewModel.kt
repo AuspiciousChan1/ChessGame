@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ChessActivity
+import com.chenjili.chessgame.pages.edit.EditModeActivity
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -70,13 +71,22 @@ class MenuViewModel(application: Application): AndroidViewModel(application) {
                 viewModelScope.launch {
                     _effect.emit(
                         MenuEffect.NavigateTo(
-                            target = ChessActivity::class.java
+                            target = EditModeActivity::class.java,
+                            flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
                         )
                     )
                 }
             }
             ItemRouteType.SINGLE_PLAYER -> {
                 // 导航到单人游戏
+                viewModelScope.launch {
+                    _effect.emit(
+                        MenuEffect.NavigateTo(
+                            target = ChessActivity::class.java,
+                            flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        )
+                    )
+                }
             }
             ItemRouteType.MULTI_PLAYER -> {
                 // 导航到多人游戏
