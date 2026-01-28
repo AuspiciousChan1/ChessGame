@@ -29,10 +29,19 @@ data class ChessMove(
     val notation: String // e.g., "Nb1-c3"
 )
 
+// Pending pawn promotion info
+data class PendingPromotion(
+    val from: Position,
+    val to: Position,
+    val pieceColor: PieceColor
+)
+
 // MVI: Intent - 表示用户的所有可能操作
 sealed interface ChessIntent {
     data class PlayerColorChanged(val newColor: PieceColor) : ChessIntent
     data class BoardCellClicked(val column: Int, val row: Int, val playerColor: PieceColor) : ChessIntent
+    data class PromotionPieceSelected(val pieceType: PieceType) : ChessIntent
+    object PromotionCancelled : ChessIntent
 }
 
 // MVI: State - 表示整个UI状态
@@ -40,7 +49,8 @@ data class ChessState(
     val pieces: List<ChessPieceDisplay> = emptyList(),
     val playerColor: PieceColor = PieceColor.WHITE,
     val selectedCell: Pair<Int, Int>? = null, // (column, row) of the selected cell
-    val moveHistory: List<ChessMove> = emptyList() // History of all moves
+    val moveHistory: List<ChessMove> = emptyList(), // History of all moves
+    val pendingPromotion: PendingPromotion? = null // Pending promotion awaiting user choice
 )
 
 class ChessViewModel(application: Application) : AndroidViewModel(application) {
@@ -139,6 +149,8 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         when (intent) {
             is ChessIntent.PlayerColorChanged -> handlePlayerColorChanged(intent.newColor)
             is ChessIntent.BoardCellClicked -> handleBoardCellClicked(intent.column, intent.row)
+            is ChessIntent.PromotionPieceSelected -> handlePromotionPieceSelected(intent.pieceType)
+            is ChessIntent.PromotionCancelled -> handlePromotionCancelled()
         }
     }
 
@@ -219,10 +231,39 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     Position(7 - column, 7 - row)
                 }
+                
+                // Check if this is a pawn promotion move
+                val isPawnPromotion = selectedPiece.piece.type == PieceType.PAWN &&
+                    ((selectedPiece.piece.color == PieceColor.WHITE && clickedPosition.rank == 7) ||
+                     (selectedPiece.piece.color == PieceColor.BLACK && clickedPosition.rank == 0))
+                
+                // First check if move is legal
+                val legalMoves = chessGame.getLegalMoves(selectedPosition)
+                val isLegalMove = legalMoves.any { it.to == clickedPosition }
+                
+                if (!isLegalMove) {
+                    // Illegal move - ignore
+                    _state.value = currentState.copy(selectedCell = null)
+                    return
+                }
+                
+                // If this is a pawn promotion, show the dialog instead of making the move
+                if (isPawnPromotion) {
+                    _state.value = currentState.copy(
+                        selectedCell = null,
+                        pendingPromotion = PendingPromotion(
+                            from = selectedPosition,
+                            to = clickedPosition,
+                            pieceColor = selectedPiece.piece.color
+                        )
+                    )
+                    return
+                }
+                
+                // Make the move (not a promotion)
                 val move: Move? = chessGame.makeMove(selectedPosition, clickedPosition)
                 if (move == null) {
-                    // Illegal move - ignore
-                    // @CJL/TODO: 可以考虑给用户一些反馈，提示非法走法
+                    // This shouldn't happen since we checked legality above
                     _state.value = currentState.copy(selectedCell = null)
                     return
                 }
@@ -344,5 +385,78 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun cancelSelect() {
         _state.value = _state.value.copy(selectedCell = null)
+    }
+    
+    private fun handlePromotionPieceSelected(pieceType: PieceType) {
+        val currentState = _state.value
+        val pendingPromotion = currentState.pendingPromotion ?: return
+        
+        // Make the move with the selected promotion piece
+        val move: Move? = chessGame.makeMove(
+            pendingPromotion.from,
+            pendingPromotion.to,
+            pieceType
+        )
+        
+        if (move == null) {
+            // This shouldn't happen but handle gracefully
+            _state.value = currentState.copy(pendingPromotion = null)
+            return
+        }
+        
+        val isInCheck = chessGame.isInCheck(
+            if (move.piece.color == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
+        )
+        val moveNotation = getMoveNotation(move, isInCheck)
+        
+        val newMove = ChessMove(
+            move = move,
+            playerColor = currentState.playerColor,
+            notation = moveNotation
+        )
+        
+        // Update the board state
+        val playerColor = currentState.playerColor
+        val fromCol = if (playerColor == PieceColor.WHITE) pendingPromotion.from.file else 7 - pendingPromotion.from.file
+        val fromRow = if (playerColor == PieceColor.WHITE) pendingPromotion.from.rank else 7 - pendingPromotion.from.rank
+        val toCol = if (playerColor == PieceColor.WHITE) pendingPromotion.to.file else 7 - pendingPromotion.to.file
+        val toRow = if (playerColor == PieceColor.WHITE) pendingPromotion.to.rank else 7 - pendingPromotion.to.rank
+        
+        val updatedPieces = currentState.pieces.let { currentPieces ->
+            // Remove captured piece if exists
+            val withoutCaptured = if (move.capturedPiece != null) {
+                currentPieces.filterNot { p ->
+                    p.column == toCol && p.row == toRow
+                }
+            } else {
+                currentPieces
+            }
+            
+            // Move and promote the pawn
+            withoutCaptured.map { pieceDisplay ->
+                if (pieceDisplay.column == fromCol && pieceDisplay.row == fromRow) {
+                    // Promote the pawn to selected piece
+                    val updatedPiece = pieceDisplay.piece.copy(type = pieceType)
+                    pieceDisplay.copy(
+                        piece = updatedPiece,
+                        column = toCol,
+                        row = toRow
+                    )
+                } else {
+                    pieceDisplay
+                }
+            }
+        }
+        
+        _state.value = currentState.copy(
+            pieces = updatedPieces,
+            selectedCell = null,
+            pendingPromotion = null,
+            moveHistory = currentState.moveHistory + newMove
+        )
+    }
+    
+    private fun handlePromotionCancelled() {
+        _state.value = _state.value.copy(pendingPromotion = null)
     }
 }

@@ -6,6 +6,14 @@
     <string name="game_record">Game record</string>
     <string name="notation_empty_move">--</string>
     <string name="clear_board">clear</string>
+    <string name="promotion">promotion</string>
+    <string name="choose_promotion_piece">choose promotion piece</string>
+    <string name="king">king</string>
+    <string name="queen">queen</string>
+    <string name="rook">rook</string>
+    <string name="bishop">bishop</string>
+    <string name="knight">knight</string>
+    <string name="pawn">pawn</string>
 
     <string name="activity_menu_label">MenuPage</string>
     <string name="activity_menu_title">Chess</string>
@@ -14,5 +22,5 @@
     <string name="activity_menu_item_two_player">Two Player</string>
     <string name="activity_menu_item_settings">Setting</string>
     <string name="activity_menu_item_about">About</string>
-    <string name="title_activity_edit_mode">EditModeActivity</string>
+    <string name="activity_edit_mode_title">EditModeActivity</string>
 </resources>

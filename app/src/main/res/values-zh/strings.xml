@@ -7,6 +7,14 @@
     <string name="game_record">棋谱</string>
     <string name="notation_empty_move">--</string>
     <string name="clear_board">清空棋盘</string>
+    <string name="promotion">升变</string>
+    <string name="choose_promotion_piece">选择升变棋子</string>
+    <string name="king">王</string>
+    <string name="queen">后</string>
+    <string name="rook">车</string>
+    <string name="bishop">象</string>
+    <string name="knight">马</string>
+    <string name="pawn">兵</string>
 
     <string name="activity_menu_label">目录页面</string>
     <string name="activity_menu_title">国际象棋</string>
@@ -15,4 +23,5 @@
     <string name="activity_menu_item_two_player">双人对战</string>
     <string name="activity_menu_item_settings">游戏设置</string>
     <string name="activity_menu_item_about">关于我们</string>
+    <string name="activity_edit_mode_title">编辑模式</string>
 </resources>
