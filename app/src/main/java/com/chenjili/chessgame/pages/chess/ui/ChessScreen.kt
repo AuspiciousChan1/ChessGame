@@ -62,6 +62,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.draw.scale
@@ -71,6 +72,7 @@ import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import java.util.ArrayList
+import kotlin.div
 
 
 @Composable
@@ -144,27 +146,34 @@ fun PromotionDialog(
                         PieceType.KNIGHT to stringResource(R.string.knight),
                     )
 
-                    // 2 * 2 网格布局，避免超出弹窗
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    // 根据弹窗可用宽度动态计算每个按钮宽度（2 列）
+                    val gridGap = 12.dp
+                    BoxWithConstraints(
                         modifier = Modifier.padding(vertical = 8.dp)
                     ) {
-                        choices.chunked(2).forEach { rowItems ->
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                rowItems.forEach { (pieceType, name) ->
-                                    PromotionPieceButton(
-                                        pieceType = pieceType,
-                                        pieceColor = pieceColor,
-                                        name = name,
-                                        onClick = {
-                                            showDialog.value = false
-                                            onPieceSelected(pieceType)
-                                        }
-                                    )
+                        val buttonWidth = ((maxWidth - gridGap) / 2f).coerceAtLeast(96.dp)
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(gridGap),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            choices.chunked(2).forEach { rowItems ->
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(gridGap),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    rowItems.forEach { (pieceType, name) ->
+                                        PromotionPieceButton(
+                                            pieceType = pieceType,
+                                            pieceColor = pieceColor,
+                                            name = name,
+                                            width = buttonWidth,
+                                            onClick = {
+                                                showDialog.value = false
+                                                onPieceSelected(pieceType)
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -180,10 +189,12 @@ fun PromotionPieceButton(
     pieceType: PieceType,
     pieceColor: PieceColor,
     name: String,
+    width: Dp,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
     val isPressed = remember { mutableStateOf(false) }
+    val density = LocalDensity.current
 
     val scale by animateFloatAsState(
         targetValue = if (isPressed.value) 0.9f else 1f,
@@ -193,6 +204,36 @@ fun PromotionPieceButton(
         ),
         label = "buttonScale"
     )
+
+    // 以按钮宽度为基准动态计算 UI 尺寸（带上下限，避免极端窗口）
+    val wPx = with(density) { width.toPx() }.coerceAtLeast(1f)
+
+    fun lerpPxToDp(minPx: Float, maxPx: Float, t: Float): Dp {
+        val v = minPx + (maxPx - minPx) * t.coerceIn(0f, 1f)
+        return with(density) { v.toDp() }
+    }
+
+    // 以 96dp \~ 200dp 的宽度区间映射到 0..1
+    val t = ((wPx - with(density) { 96.dp.toPx() }) /
+            (with(density) { 200.dp.toPx() } - with(density) { 96.dp.toPx() }))
+        .coerceIn(0f, 1f)
+
+    val cornerRadius = lerpPxToDp(minPx = 10f, maxPx = 16f, t = t)
+    val borderWidth = lerpPxToDp(minPx = 1.5f, maxPx = 2.5f, t = t)
+    val paddingH = lerpPxToDp(minPx = 8f, maxPx = 14f, t = t)
+    val paddingV = lerpPxToDp(minPx = 8f, maxPx = 14f, t = t)
+
+    // 图片大小：约等于按钮宽度的 0.55 \~ 0.62，并限制到合理范围
+    val iconSize = with(density) {
+        (wPx * (0.55f + 0.07f * t)).toDp().coerceIn(44.dp, 84.dp)
+    }
+
+    // 字号随宽度线性增长，并限制范围
+    val labelSp = with(density) {
+        val sp = (10f + 4f * t) // 10sp \~ 14sp
+        sp
+    }
+    val topGap = lerpPxToDp(minPx = 4f, maxPx = 8f, t = t)
 
     val typeName = when (pieceType) {
         PieceType.QUEEN -> "queen"
@@ -208,7 +249,8 @@ fun PromotionPieceButton(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(120.dp) // 固定按钮宽度，2 列更稳
+            .width(width)
+            .aspectRatio(1f)
             .scale(scale)
             .clickable {
                 isPressed.value = true
@@ -216,27 +258,28 @@ fun PromotionPieceButton(
             }
             .background(
                 color = colorResource(R.color.walnut_light),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(cornerRadius)
             )
             .border(
-                BorderStroke(2.dp, colorResource(R.color.walnut_grain)),
-                shape = RoundedCornerShape(12.dp)
+                BorderStroke(borderWidth, colorResource(R.color.walnut_grain)),
+                shape = RoundedCornerShape(cornerRadius)
             )
-            .padding(horizontal = 10.dp, vertical = 10.dp) // 收紧内边距，避免弹窗溢出
+            .padding(horizontal = paddingH, vertical = paddingV)
     ) {
         if (resId != 0) {
             Image(
                 painter = painterResource(id = resId),
                 contentDescription = "${colorName} ${typeName}",
-                modifier = Modifier.size(48.dp) // 略缩小图标
+                modifier = Modifier.size(iconSize).padding(10.dp)
             )
         }
+
         Text(
             text = name,
-            fontSize = 12.sp,
+            fontSize = labelSp.sp,
             color = Color.White,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(top = 6.dp)
+            modifier = Modifier.padding(top = topGap)
         )
     }
 }
