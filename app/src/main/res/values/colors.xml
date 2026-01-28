@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="chess_piece_selected_cell_overlay_color">#8000FF00</color>
+    
+    <!-- Walnut wood theme colors for promotion dialog -->
+    <color name="walnut_dark">#FF5D4037</color>
+    <color name="walnut_medium">#FF795548</color>
+    <color name="walnut_light">#FFA1887F</color>
+    <color name="walnut_grain">#FF4E342E</color>
+    <color name="walnut_accent">#FFFFB74D</color>
 
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>

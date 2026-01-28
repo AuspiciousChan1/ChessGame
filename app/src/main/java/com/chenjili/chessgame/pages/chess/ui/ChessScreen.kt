@@ -42,13 +42,194 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import java.util.ArrayList
+
+
+@Composable
+fun PromotionDialog(
+    pieceColor: PieceColor,
+    onPieceSelected: (PieceType) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val showDialog = remember { mutableStateOf(true) }
+    
+    // Infinite shimmer animation for surprise element
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmer"
+    )
+    
+    AnimatedVisibility(
+        visible = showDialog.value,
+        enter = fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.8f),
+        exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.8f)
+    ) {
+        Dialog(
+            onDismissRequest = {
+                showDialog.value = false
+                onDismiss()
+            },
+            properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .shadow(16.dp, RoundedCornerShape(16.dp))
+                    .background(
+                        color = colorResource(R.color.walnut_medium),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .border(
+                        BorderStroke(3.dp, colorResource(R.color.walnut_dark)),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .padding(24.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Title with shimmer effect
+                    Text(
+                        text = "升变！🎉",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorResource(R.color.walnut_accent).copy(alpha = shimmerAlpha),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    Text(
+                        text = "选择升变的棋子",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    // Grid of promotion choices
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    ) {
+                        listOf(
+                            PieceType.QUEEN to "后",
+                            PieceType.ROOK to "车",
+                            PieceType.BISHOP to "象",
+                            PieceType.KNIGHT to "马"
+                        ).forEach { (pieceType, chineseName) ->
+                            PromotionPieceButton(
+                                pieceType = pieceType,
+                                pieceColor = pieceColor,
+                                chineseName = chineseName,
+                                onClick = {
+                                    showDialog.value = false
+                                    onPieceSelected(pieceType)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PromotionPieceButton(
+    pieceType: PieceType,
+    pieceColor: PieceColor,
+    chineseName: String,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val isPressed = remember { mutableStateOf(false) }
+    
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed.value) 0.9f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "buttonScale"
+    )
+    
+    val typeName = when (pieceType) {
+        PieceType.QUEEN -> "queen"
+        PieceType.ROOK -> "rook"
+        PieceType.BISHOP -> "bishop"
+        PieceType.KNIGHT -> "knight"
+        else -> "queen"
+    }
+    val colorName = if (pieceColor == PieceColor.WHITE) "white" else "black"
+    val resName = "chess_piece_${colorName}_$typeName"
+    val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .scale(scale)
+            .clickable {
+                isPressed.value = true
+                onClick()
+            }
+            .background(
+                color = colorResource(R.color.walnut_light),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .border(
+                BorderStroke(2.dp, colorResource(R.color.walnut_grain)),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(12.dp)
+    ) {
+        if (resId != 0) {
+            Image(
+                painter = painterResource(id = resId),
+                contentDescription = "$colorName $typeName",
+                modifier = Modifier.size(60.dp)
+            )
+        }
+        Text(
+            text = chineseName,
+            fontSize = 12.sp,
+            color = Color.White,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+}
 
 @Composable
 fun ChessScreen(
@@ -323,6 +504,19 @@ fun ChessScreen(
                             }
                         }
                     }
+                }
+                
+                // Show promotion dialog when there's a pending promotion
+                state.pendingPromotion?.let { pendingPromotion ->
+                    PromotionDialog(
+                        pieceColor = pendingPromotion.pieceColor,
+                        onPieceSelected = { pieceType ->
+                            onIntent(ChessIntent.PromotionPieceSelected(pieceType))
+                        },
+                        onDismiss = {
+                            onIntent(ChessIntent.PromotionCancelled)
+                        }
+                    )
                 }
             }
         }
