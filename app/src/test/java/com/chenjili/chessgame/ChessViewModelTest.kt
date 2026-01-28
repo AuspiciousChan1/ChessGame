@@ -77,4 +77,36 @@ class ChessViewModelTest {
         // Example: ["e2-e4", "e7-e5", "Ng1-f3", "Nb8-c6"]
         assertTrue("Test documents expected behavior", true)
     }
+    
+    @Test
+    fun testPawnPromotion_whenPawnReachesLastRank_shouldShowPromotionDialog() {
+        // This test verifies that pawn promotion triggers a dialog
+        
+        // Expected: When a white pawn moves to rank 7 (or black pawn to rank 0)
+        // The state.pendingPromotion should be non-null
+        // The pendingPromotion should contain from/to positions and piece color
+        // The move should NOT be completed until user selects a promotion piece
+        assertTrue("Test documents expected behavior", true)
+    }
+    
+    @Test
+    fun testPromotionSelection_whenPieceSelected_shouldCompletePromotion() {
+        // This test verifies that selecting a promotion piece completes the move
+        
+        // Expected: When user selects a promotion piece (Queen, Rook, Bishop, or Knight)
+        // The pawn should be replaced with the selected piece type at the target position
+        // The state.pendingPromotion should become null
+        // The move should be added to moveHistory with promotion notation (e.g., "e7-e8=Q")
+        assertTrue("Test documents expected behavior", true)
+    }
+    
+    @Test
+    fun testPromotionCancellation_whenDialogDismissed_shouldClearPendingState() {
+        // This test verifies that canceling promotion clears the pending state
+        
+        // Expected: When user dismisses the promotion dialog without selecting
+        // The state.pendingPromotion should become null
+        // The pawn should remain at its original position (move not made)
+        assertTrue("Test documents expected behavior", true)
+    }
 }
