@@ -57,11 +57,12 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -80,8 +81,7 @@ fun PromotionDialog(
 ) {
     val context = LocalContext.current
     val showDialog = remember { mutableStateOf(true) }
-    
-    // Infinite shimmer animation for surprise element
+
     val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
     val shimmerAlpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
@@ -92,7 +92,7 @@ fun PromotionDialog(
         ),
         label = "shimmer"
     )
-    
+
     AnimatedVisibility(
         visible = showDialog.value,
         enter = fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.8f),
@@ -122,42 +122,51 @@ fun PromotionDialog(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Title with shimmer effect
                     Text(
-                        text = "升变！🎉",
+                        text = "${stringResource(R.string.promotion)}🎉",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = colorResource(R.color.walnut_accent).copy(alpha = shimmerAlpha),
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    
+
                     Text(
-                        text = "选择升变的棋子",
+                        text = stringResource(R.string.choose_promotion_piece),
                         fontSize = 16.sp,
                         color = Color.White,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    
-                    // Grid of promotion choices
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+
+                    val choices = listOf(
+                        PieceType.QUEEN to stringResource(R.string.queen),
+                        PieceType.ROOK to stringResource(R.string.rook),
+                        PieceType.BISHOP to stringResource(R.string.bishop),
+                        PieceType.KNIGHT to stringResource(R.string.knight),
+                    )
+
+                    // 2 * 2 网格布局，避免超出弹窗
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(vertical = 8.dp)
                     ) {
-                        listOf(
-                            PieceType.QUEEN to "后",
-                            PieceType.ROOK to "车",
-                            PieceType.BISHOP to "象",
-                            PieceType.KNIGHT to "马"
-                        ).forEach { (pieceType, chineseName) ->
-                            PromotionPieceButton(
-                                pieceType = pieceType,
-                                pieceColor = pieceColor,
-                                chineseName = chineseName,
-                                onClick = {
-                                    showDialog.value = false
-                                    onPieceSelected(pieceType)
+                        choices.chunked(2).forEach { rowItems ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                rowItems.forEach { (pieceType, name) ->
+                                    PromotionPieceButton(
+                                        pieceType = pieceType,
+                                        pieceColor = pieceColor,
+                                        name = name,
+                                        onClick = {
+                                            showDialog.value = false
+                                            onPieceSelected(pieceType)
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -170,12 +179,12 @@ fun PromotionDialog(
 fun PromotionPieceButton(
     pieceType: PieceType,
     pieceColor: PieceColor,
-    chineseName: String,
+    name: String,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
     val isPressed = remember { mutableStateOf(false) }
-    
+
     val scale by animateFloatAsState(
         targetValue = if (isPressed.value) 0.9f else 1f,
         animationSpec = spring(
@@ -184,7 +193,7 @@ fun PromotionPieceButton(
         ),
         label = "buttonScale"
     )
-    
+
     val typeName = when (pieceType) {
         PieceType.QUEEN -> "queen"
         PieceType.ROOK -> "rook"
@@ -195,10 +204,11 @@ fun PromotionPieceButton(
     val colorName = if (pieceColor == PieceColor.WHITE) "white" else "black"
     val resName = "chess_piece_${colorName}_$typeName"
     val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
-    
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
+            .width(120.dp) // 固定按钮宽度，2 列更稳
             .scale(scale)
             .clickable {
                 isPressed.value = true
@@ -212,21 +222,21 @@ fun PromotionPieceButton(
                 BorderStroke(2.dp, colorResource(R.color.walnut_grain)),
                 shape = RoundedCornerShape(12.dp)
             )
-            .padding(12.dp)
+            .padding(horizontal = 10.dp, vertical = 10.dp) // 收紧内边距，避免弹窗溢出
     ) {
         if (resId != 0) {
             Image(
                 painter = painterResource(id = resId),
-                contentDescription = "$colorName $typeName",
-                modifier = Modifier.size(60.dp)
+                contentDescription = "${colorName} ${typeName}",
+                modifier = Modifier.size(48.dp) // 略缩小图标
             )
         }
         Text(
-            text = chineseName,
+            text = name,
             fontSize = 12.sp,
             color = Color.White,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(top = 4.dp)
+            modifier = Modifier.padding(top = 6.dp)
         )
     }
 }
@@ -269,7 +279,8 @@ fun ChessScreen(
                         .padding(top = initialTopOffset), // 固定顶部偏移，防止后续内容变化导致移动
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top // 改为从顶部开始布局
-                ) {
+                )
+                {
                     // 棋盘区
                     Box(
                         modifier = Modifier
