@@ -42,13 +42,204 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
 import java.util.ArrayList
+
+
+@Composable
+fun PromotionDialog(
+    pieceColor: PieceColor,
+    onPieceSelected: (PieceType) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val showDialog = remember { mutableStateOf(true) }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmer"
+    )
+
+    AnimatedVisibility(
+        visible = showDialog.value,
+        enter = fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.8f),
+        exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.8f)
+    ) {
+        Dialog(
+            onDismissRequest = {
+                showDialog.value = false
+                onDismiss()
+            },
+            properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .shadow(16.dp, RoundedCornerShape(16.dp))
+                    .background(
+                        color = colorResource(R.color.walnut_medium),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .border(
+                        BorderStroke(3.dp, colorResource(R.color.walnut_dark)),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .padding(24.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "${stringResource(R.string.promotion)}🎉",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorResource(R.color.walnut_accent).copy(alpha = shimmerAlpha),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Text(
+                        text = stringResource(R.string.choose_promotion_piece),
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    val choices = listOf(
+                        PieceType.QUEEN to stringResource(R.string.queen),
+                        PieceType.ROOK to stringResource(R.string.rook),
+                        PieceType.BISHOP to stringResource(R.string.bishop),
+                        PieceType.KNIGHT to stringResource(R.string.knight),
+                    )
+
+                    // 2 * 2 网格布局，避免超出弹窗
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    ) {
+                        choices.chunked(2).forEach { rowItems ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                rowItems.forEach { (pieceType, name) ->
+                                    PromotionPieceButton(
+                                        pieceType = pieceType,
+                                        pieceColor = pieceColor,
+                                        name = name,
+                                        onClick = {
+                                            showDialog.value = false
+                                            onPieceSelected(pieceType)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PromotionPieceButton(
+    pieceType: PieceType,
+    pieceColor: PieceColor,
+    name: String,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val isPressed = remember { mutableStateOf(false) }
+
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed.value) 0.9f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "buttonScale"
+    )
+
+    val typeName = when (pieceType) {
+        PieceType.QUEEN -> "queen"
+        PieceType.ROOK -> "rook"
+        PieceType.BISHOP -> "bishop"
+        PieceType.KNIGHT -> "knight"
+        else -> "queen"
+    }
+    val colorName = if (pieceColor == PieceColor.WHITE) "white" else "black"
+    val resName = "chess_piece_${colorName}_$typeName"
+    val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(120.dp) // 固定按钮宽度，2 列更稳
+            .scale(scale)
+            .clickable {
+                isPressed.value = true
+                onClick()
+            }
+            .background(
+                color = colorResource(R.color.walnut_light),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .border(
+                BorderStroke(2.dp, colorResource(R.color.walnut_grain)),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 10.dp, vertical = 10.dp) // 收紧内边距，避免弹窗溢出
+    ) {
+        if (resId != 0) {
+            Image(
+                painter = painterResource(id = resId),
+                contentDescription = "${colorName} ${typeName}",
+                modifier = Modifier.size(48.dp) // 略缩小图标
+            )
+        }
+        Text(
+            text = name,
+            fontSize = 12.sp,
+            color = Color.White,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+    }
+}
 
 @Composable
 fun ChessScreen(
@@ -70,8 +261,6 @@ fun ChessScreen(
                 val density = LocalDensity.current
                 val context = LocalContext.current
                 val initialTopOffset = remember { (maxH - squareSize) / 2f }
-                val pieceSize = squareSize / 10f
-                val pieceSpacing = 8.dp
 
                 // 背景图
                 Image(
@@ -90,7 +279,8 @@ fun ChessScreen(
                         .padding(top = initialTopOffset), // 固定顶部偏移，防止后续内容变化导致移动
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top // 改为从顶部开始布局
-                ) {
+                )
+                {
                     // 棋盘区
                     Box(
                         modifier = Modifier
@@ -256,7 +446,7 @@ fun ChessScreen(
                                 var whiteCache: String = ""
                                 for (move in moves) {
                                     val notation = move.notation
-                                    val pieceColor = move.pieceColor
+                                    val pieceColor = move.move.piece.color
                                     when(pieceColor) {
                                         PieceColor.WHITE -> {
                                             if (whiteCache.isNotEmpty()) {
@@ -325,6 +515,19 @@ fun ChessScreen(
                             }
                         }
                     }
+                }
+                
+                // Show promotion dialog when there's a pending promotion
+                state.pendingPromotion?.let { pendingPromotion ->
+                    PromotionDialog(
+                        pieceColor = pendingPromotion.pieceColor,
+                        onPieceSelected = { pieceType ->
+                            onIntent(ChessIntent.PromotionPieceSelected(pieceType))
+                        },
+                        onDismiss = {
+                            onIntent(ChessIntent.PromotionCancelled)
+                        }
+                    )
                 }
             }
         }

@@ -81,6 +81,13 @@ interface IChessGame {
      * @return List of all legal moves
      */
     fun getLegalMoves(position: Position? = null): List<Move>
+
+    /**
+     * 判断指定颜色的王当前是否处于被将军状态
+     * @param color 要判断哪一方是否被将军
+     * @return true 表示该方正在被将军
+     */
+    fun isInCheck(color: PieceColor): Boolean
     
     /**
      * Get the current game state
