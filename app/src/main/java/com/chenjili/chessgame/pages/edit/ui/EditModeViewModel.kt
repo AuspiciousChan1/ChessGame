@@ -29,7 +29,7 @@ sealed interface EditModeIntent {
     data class PlayerColorChanged(val newColor: PieceColor) : EditModeIntent
     data class BoardCellClicked(val column: Int, val row: Int, val playerColor: PieceColor): EditModeIntent
     data class PieceForEditClicked(val removeMode: Boolean, val piece: Piece?,): EditModeIntent
-    data class ClearBoard(val unused: Unit): EditModeIntent
+    object ClearBoard: EditModeIntent
 }
 
 class EditModeViewModel : ViewModel() {

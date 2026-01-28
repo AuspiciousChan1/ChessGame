@@ -238,7 +238,7 @@ fun EditModeScreen(
                         }
                         Button(
                             onClick = {
-                                onIntent(EditModeIntent.ClearBoard(Unit))
+                                onIntent(EditModeIntent.ClearBoard)
                             }
                         ) {
                             Text(text = stringResource(id = R.string.clear_board))

@@ -2,12 +2,16 @@
 <resources>
     <string name="app_name">国际象棋</string>
     <string name="title_activity_chess">国际象棋页面</string>
+    <string name="empty_string"></string>
     <string name="switch_side">切换阵营</string>
+    <string name="restart_game">重新开局</string>
     <string name="chess_board_description">棋盘</string>
     <string name="game_record">棋谱</string>
     <string name="notation_empty_move">--</string>
     <string name="clear_board">清空棋盘</string>
     <string name="promotion">升变</string>
+    <string name="game_over">棋局结束</string>
+    <string name="ok">确认</string>
     <string name="choose_promotion_piece">选择升变棋子</string>
     <string name="king">王</string>
     <string name="queen">后</string>
@@ -24,4 +28,12 @@
     <string name="activity_menu_item_settings">游戏设置</string>
     <string name="activity_menu_item_about">关于我们</string>
     <string name="activity_edit_mode_title">编辑模式</string>
+
+    <string name="game_state_desc_in_progress">对局进行中</string>
+    <string name="game_state_desc_checkmate_white_wins">白方获胜</string>
+    <string name="game_state_desc_checkmate_black_wins">黑方获胜</string>
+    <string name="game_state_desc_stalemate">逼和</string>
+    <string name="game_state_desc_draw_by_insufficient_material">和棋 棋子不足</string>
+    <string name="game_state_desc_draw_by_fifty_move_rule">和棋 50回合规则</string>
+    <string name="game_state_desc_draw_by_threefold_repetition">和棋 三次重复</string>
 </resources>

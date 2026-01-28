@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.chenjili.chess.api.ChessServiceFactory
+import com.chenjili.chess.api.GameState
 import com.chenjili.chess.api.IChessGame
 import com.chenjili.chess.api.IChessService
 import com.chenjili.chess.api.Move
@@ -39,9 +40,11 @@ data class PendingPromotion(
 // MVI: Intent - 表示用户的所有可能操作
 sealed interface ChessIntent {
     data class PlayerColorChanged(val newColor: PieceColor) : ChessIntent
+    data class RestartGame(val playerColor: PieceColor) : ChessIntent
     data class BoardCellClicked(val column: Int, val row: Int, val playerColor: PieceColor) : ChessIntent
     data class PromotionPieceSelected(val pieceType: PieceType) : ChessIntent
     object PromotionCancelled : ChessIntent
+    object GameOverDialogDismissed : ChessIntent
 }
 
 // MVI: State - 表示整个UI状态
@@ -50,6 +53,7 @@ data class ChessState(
     val playerColor: PieceColor = PieceColor.WHITE,
     val selectedCell: Pair<Int, Int>? = null, // (column, row) of the selected cell
     val moveHistory: List<ChessMove> = emptyList(), // History of all moves
+    val gameState: GameState = GameState.IN_PROGRESS, // 游戏状态
     val pendingPromotion: PendingPromotion? = null // Pending promotion awaiting user choice
 )
 
@@ -61,12 +65,15 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            initPieces()
             chessGame = ChessServiceFactory.chessService.createGame()
+            _state.value = ChessState(
+                pieces = initPieces(),
+                playerColor = PieceColor.WHITE
+            )
         }
     }
 
-    private fun initPieces() {
+    private fun initPieces(): List<ChessPieceDisplay> {
         // 初始化棋盘
         val initialPieces = mutableListOf<ChessPieceDisplay>()
         var pieceId = 0
@@ -98,10 +105,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             ChessPieceDisplay(Piece(PieceType.KNIGHT, PieceColor.BLACK), 6, 7, pieceId++),
             ChessPieceDisplay(Piece(PieceType.ROOK, PieceColor.BLACK), 7, 7, pieceId++)
         )
-        _state.value = ChessState(
-            pieces = initialPieces,
-            playerColor = PieceColor.WHITE
-        )
+        return initialPieces
     }
 
     // Helper function to get piece notation prefix
@@ -148,9 +152,11 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     fun processIntent(intent: ChessIntent) {
         when (intent) {
             is ChessIntent.PlayerColorChanged -> handlePlayerColorChanged(intent.newColor)
+            is ChessIntent.RestartGame -> handleRestartGame(intent.playerColor)
             is ChessIntent.BoardCellClicked -> handleBoardCellClicked(intent.column, intent.row)
             is ChessIntent.PromotionPieceSelected -> handlePromotionPieceSelected(intent.pieceType)
             is ChessIntent.PromotionCancelled -> handlePromotionCancelled()
+            is ChessIntent.GameOverDialogDismissed -> handleGameOverDialogDismissed()
         }
     }
 
@@ -167,6 +173,14 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             playerColor = newColor,
             pieces = updatedPieces,
             selectedCell = null // Clear selection when switching sides
+        )
+    }
+
+    private fun handleRestartGame(playerColor: PieceColor) {
+        chessGame.reset()
+        _state.value = ChessState(
+            pieces = initPieces(),
+            playerColor = playerColor,
         )
     }
 
@@ -365,10 +379,12 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
                 }
 
+                val gameState: GameState = chessGame.getGameState()
                 _state.value = currentState.copy(
                     pieces = updatedPieces,
                     selectedCell = null,
-                    moveHistory = currentState.moveHistory + newMove
+                    moveHistory = currentState.moveHistory + newMove,
+                    gameState = gameState,
                 )
             }
             
@@ -458,5 +474,9 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     
     private fun handlePromotionCancelled() {
         _state.value = _state.value.copy(pendingPromotion = null)
+    }
+
+    private fun handleGameOverDialogDismissed() {
+
     }
 }
