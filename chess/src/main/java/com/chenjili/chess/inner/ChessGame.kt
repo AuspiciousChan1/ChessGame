@@ -3,6 +3,7 @@ package com.chenjili.chess.inner
 import com.chenjili.chess.api.*
 import java.util.UUID
 import kotlin.collections.get
+import kotlin.compareTo
 import kotlin.div
 import kotlin.inc
 import kotlin.text.compareTo
@@ -388,19 +389,15 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         
         val isEnPassant = matchingMove.isEnPassant
         val isCastling = matchingMove.isCastling
-        
-        // Save current state before making the move
-        stateHistory.add(createSnapshot())
-        
-        // Determine captured piece (handle en passant)
-        var capturedPiece: Piece? = if (isEnPassant) {
-            // The captured pawn is on the same rank as 'from' and in file 'to.file'
+
+        // 记录被捕获的棋子
+        val capturedPiece: Piece? = if (isEnPassant) {
             getPieceAt(Position(to.file, from.rank))
         } else {
             getPieceAt(to)
         }
 
-        // Execute move
+        // 执行移动逻辑
         board[from.rank][from.file] = null
         
         if (isCastling) {
@@ -432,8 +429,8 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
                 board[to.rank][to.file] = piece
             }
         }
-        
-        // Update castling rights
+
+        // 更新游戏状态变量
         updateCastlingRights(piece, from)
         
         // Update en passant target
@@ -455,6 +452,10 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         activeColor = if (activeColor == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
         
         // Record move
+
+        // 在所有变量更新完成后，记录当前状态快照
+        stateHistory.add(createSnapshot())
+
         val move = Move(from, to, piece, capturedPiece, isEnPassant, isCastling, finalPromotionPiece)
         moveHistory.add(move)
         
@@ -953,46 +954,37 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     }
     
     override fun undoLastMove(): Boolean {
-        // Need at least 2 states (initial + 1 move) to undo
-        if (stateHistory.size < 2 || moveHistory.isEmpty()) {
+        // moveHistory.size 与 stateHistory.size - 1 保持同步
+        if (moveHistory.isEmpty() || stateHistory.size < 2) {
             return false
         }
-        
-        // Remove the last state (current state)
+
+        // 1. 移除当前最新的快照
         stateHistory.removeAt(stateHistory.size - 1)
-        
-        // Restore the previous state
-        val previousState = stateHistory.last()
-        restoreSnapshot(previousState)
-        
-        // Remove the last move from history
+
+        // 2. 恢复到移除后的最后一个快照（即上一步之后的状态或初始状态）
+        restoreSnapshot(stateHistory.last())
+
+        // 3. 移除移动记录
         moveHistory.removeAt(moveHistory.size - 1)
         
         return true
     }
     
     override fun undoToMove(moveNumber: Int): Boolean {
-        if (moveNumber < 0) {
+        if (moveNumber < 0 || moveNumber > moveHistory.size) {
             return false
         }
-        
-        // Move number 0 means undo all moves (return to initial state)
-        val targetHistorySize = moveNumber + 1 // +1 for initial state
-        
-        if (targetHistorySize > stateHistory.size) {
-            return false // Can't undo to a future move
-        }
-        
-        // Remove all states after the target
-        while (stateHistory.size > targetHistorySize) {
+
+        // 目标快照库大小：初始状态(1) + 保留的移动步数(moveNumber)
+        val targetSize = moveNumber + 1
+
+        while (stateHistory.size > targetSize) {
             stateHistory.removeAt(stateHistory.size - 1)
         }
-        
-        // Restore the target state
-        val targetState = stateHistory.last()
-        restoreSnapshot(targetState)
-        
-        // Trim move history to match
+
+        restoreSnapshot(stateHistory.last())
+
         while (moveHistory.size > moveNumber) {
             moveHistory.removeAt(moveHistory.size - 1)
         }
