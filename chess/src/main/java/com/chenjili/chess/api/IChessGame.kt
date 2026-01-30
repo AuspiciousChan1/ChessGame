@@ -115,7 +115,8 @@ interface IChessGame {
     
     /**
      * Undo moves to reach a specific move number
-     * @param moveNumber The move number to undo to (1-based). All moves after this will be undone.
+     * @param moveNumber The move number (0-based). 0 means initial position, 1 means after first move, etc.
+     *                   All moves after this will be undone.
      * @return true if undo was successful, false if moveNumber is invalid
      */
     fun undoToMove(moveNumber: Int): Boolean

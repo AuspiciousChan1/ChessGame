@@ -526,7 +526,8 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 pieces = updatedPieces,
                 selectedCell = null,
                 moveHistory = updatedMoveHistory,
-                gameState = gameState
+                gameState = gameState,
+                pendingPromotion = null  // Clear promotion dialog on undo
             )
         }
     }

@@ -11,6 +11,8 @@ import kotlin.to
 
 /**
  * Represents a snapshot of the game state at a particular point in time
+ * Note: This data class contains an Array field which uses referential equality.
+ * Do not rely on default equals()/hashCode() for comparing snapshots.
  */
 private data class GameStateSnapshot(
     val board: Array<Array<Piece?>>,
@@ -55,6 +57,8 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     private val moveHistory: MutableList<Move> = mutableListOf()
     
     // History of game states for undo functionality
+    // Note: This creates a deep copy of the board for each move, which could consume memory in very long games.
+    // Consider implementing a maximum history size or delta-based storage for production use.
     private val stateHistory: MutableList<GameStateSnapshot> = mutableListOf()
     
     init {
