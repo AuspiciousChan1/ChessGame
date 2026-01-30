@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.chenjili.chess.api.ChessServiceFactory
 import com.chenjili.chess.api.GameState
 import com.chenjili.chess.api.IChessGame
-import com.chenjili.chess.api.IChessService
 import com.chenjili.chess.api.Move
 import com.chenjili.chess.api.Piece
 import com.chenjili.chess.api.PieceColor
@@ -16,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.inc
 
 data class ChessPieceDisplay (
     val piece: Piece,
@@ -45,6 +45,7 @@ sealed interface ChessIntent {
     data class PromotionPieceSelected(val pieceType: PieceType) : ChessIntent
     object PromotionCancelled : ChessIntent
     object GameOverDialogDismissed : ChessIntent
+    object UndoMove : ChessIntent
 }
 
 // MVI: State - 表示整个UI状态
@@ -157,6 +158,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             is ChessIntent.PromotionPieceSelected -> handlePromotionPieceSelected(intent.pieceType)
             is ChessIntent.PromotionCancelled -> handlePromotionCancelled()
             is ChessIntent.GameOverDialogDismissed -> handleGameOverDialogDismissed()
+            is ChessIntent.UndoMove -> handleUndoMove()
         }
     }
 
@@ -478,5 +480,133 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun handleGameOverDialogDismissed() {
 
+    }
+
+    private fun handleUndoMove() {
+        if (chessGame.undoLastMove()) {
+            val currentState = _state.value
+
+            // 使用优化后的同步函数复用 ID
+            val updatedPieces = syncDisplayPieces(
+                chessGame.getAllPieces(),
+                currentState.pieces,
+                currentState.playerColor
+            )
+
+            // 重建移动历史
+            val updatedMoveHistory = mutableListOf<ChessMove>()
+            val gameMoveHistory = chessGame.getMoveHistory()
+            for (move in gameMoveHistory) {
+                val isInCheck = false
+                val moveNotation = getMoveNotation(move, isInCheck)
+                updatedMoveHistory.add(
+                    ChessMove(
+                        move = move,
+                        playerColor = currentState.playerColor,
+                        notation = moveNotation
+                    )
+                )
+            }
+
+            val gameState = chessGame.getGameState()
+
+            _state.value = currentState.copy(
+                pieces = updatedPieces,
+                selectedCell = null,
+                moveHistory = updatedMoveHistory,
+                gameState = gameState,
+                pendingPromotion = null
+            )
+        }
+    }
+
+    /**
+     * 同步逻辑棋盘与 UI 显示项目，尽量复用 ID 以维持动画连贯性
+     */
+    private fun syncDisplayPieces(
+        boardPieces: Map<Position, Piece>,
+        currentDisplay: List<ChessPieceDisplay>,
+        playerColor: PieceColor
+    ): List<ChessPieceDisplay> {
+
+        fun toDisplayCol(pos: Position): Int = if (playerColor == PieceColor.WHITE) pos.file else 7 - pos.file
+        fun toDisplayRow(pos: Position): Int = if (playerColor == PieceColor.WHITE) pos.rank else 7 - pos.rank
+
+        // 目标棋盘：Position \-\> display(cell) 与 piece
+        data class Cell(val col: Int, val row: Int)
+        data class Target(val cell: Cell, val piece: Piece)
+
+        val targets: List<Target> = boardPieces.entries.map { (pos, piece) ->
+            Target(Cell(toDisplayCol(pos), toDisplayRow(pos)), piece)
+        }
+
+        // 当前 UI：按格子索引，方便找“未移动”
+        val currentByCell: Map<Cell, ChessPieceDisplay> =
+            currentDisplay.associateBy { Cell(it.column, it.row) }
+
+        // 可复用池：用于后续“移动/升变”匹配，按 id 去重移除
+        val remainingCurrent = currentDisplay.toMutableList()
+        fun takeById(id: Int): ChessPieceDisplay? {
+            val idx = remainingCurrent.indexOfFirst { it.id == id }
+            return if (idx >= 0) remainingCurrent.removeAt(idx) else null
+        }
+        fun takeFirst(predicate: (ChessPieceDisplay) -> Boolean): ChessPieceDisplay? {
+            val idx = remainingCurrent.indexOfFirst(predicate)
+            return if (idx >= 0) remainingCurrent.removeAt(idx) else null
+        }
+
+        var maxId = currentDisplay.maxOfOrNull { it.id } ?: -1
+
+        // 结果按目标棋盘构建，保证每个 target 都有一个 display
+        val result = ArrayList<ChessPieceDisplay>(targets.size)
+
+        // 记录哪些 target 已经被生成
+        val usedTargetIndex = BooleanArray(targets.size)
+
+        // Step 1: 先匹配“未移动”：同格 \+ piece 完全相同 \-\> 直接复用该格子的 ID
+        for ((i, t) in targets.withIndex()) {
+            val cur = currentByCell[t.cell]
+            if (cur != null && cur.piece == t.piece) {
+                // 从 remainingCurrent 中移除这枚棋子，避免后续再次被当作“移动来源”
+                takeById(cur.id)
+                result.add(cur.copy(piece = t.piece, column = t.cell.col, row = t.cell.row))
+                usedTargetIndex[i] = true
+            }
+        }
+
+        // Step 2: 再匹配“移动”：剩余 target 中，找剩余 current 里同 color/type 的棋子复用 ID
+        for ((i, t) in targets.withIndex()) {
+            if (usedTargetIndex[i]) continue
+
+            val movedMatch = takeFirst { it.piece.color == t.piece.color && it.piece.type == t.piece.type }
+            if (movedMatch != null) {
+                result.add(movedMatch.copy(piece = t.piece, column = t.cell.col, row = t.cell.row))
+                usedTargetIndex[i] = true
+            }
+        }
+
+        // Step 3: 处理升变：若目标是兵，但 Step2 没找到同兵（常见于撤销升变：当前 UI 还保留着升变后的后/车/象/马）
+        // \- 规则：同 color 的“非兵”可以被视作这枚兵的前身，复用其 ID（从 remainingCurrent 里取）
+        for ((i, t) in targets.withIndex()) {
+            if (usedTargetIndex[i]) continue
+            if (t.piece.type != PieceType.PAWN) continue
+
+            val promoRevertMatch = takeFirst {
+                it.piece.color == t.piece.color && it.piece.type != PieceType.PAWN
+            }
+            if (promoRevertMatch != null) {
+                result.add(promoRevertMatch.copy(piece = t.piece, column = t.cell.col, row = t.cell.row))
+                usedTargetIndex[i] = true
+            }
+        }
+
+        // Step 4: 兜底：新出现的棋子（例如撤销吃子后回来的），分配新 ID
+        for ((i, t) in targets.withIndex()) {
+            if (usedTargetIndex[i]) continue
+            result.add(ChessPieceDisplay(piece = t.piece, column = t.cell.col, row = t.cell.row, id = ++maxId))
+            usedTargetIndex[i] = true
+        }
+
+        return result
     }
 }

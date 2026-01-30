@@ -4,6 +4,7 @@
     <string name="empty_string"></string>
     <string name="switch_side">switch side</string>
     <string name="restart_game">restart game</string>
+    <string name="undo_move">undo</string>
     <string name="chess_board_description">Chess board</string>
     <string name="game_record">Game record</string>
     <string name="notation_empty_move">--</string>

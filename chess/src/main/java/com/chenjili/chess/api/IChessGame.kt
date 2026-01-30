@@ -108,6 +108,26 @@ interface IChessGame {
     fun getMoveHistory(): List<Move>
     
     /**
+     * Undo the last move and return to previous state
+     * @return true if undo was successful, false if no move to undo
+     */
+    fun undoLastMove(): Boolean
+    
+    /**
+     * Undo moves to reach a specific move number
+     * @param moveNumber The move number (0-based). 0 means initial position, 1 means after first move, etc.
+     *                   All moves after this will be undone.
+     * @return true if undo was successful, false if moveNumber is invalid
+     */
+    fun undoToMove(moveNumber: Int): Boolean
+    
+    /**
+     * Get the number of moves that can be undone
+     * @return Number of half-moves in history
+     */
+    fun getUndoCount(): Int
+    
+    /**
      * Reset the game to initial position
      */
     fun reset()
