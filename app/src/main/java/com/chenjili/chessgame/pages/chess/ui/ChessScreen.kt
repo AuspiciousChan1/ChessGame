@@ -68,7 +68,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.chenjili.chess.api.GameState
-import com.chenjili.chess.api.Piece
 import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.R
