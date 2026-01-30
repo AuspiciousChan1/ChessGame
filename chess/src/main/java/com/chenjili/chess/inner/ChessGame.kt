@@ -10,6 +10,35 @@ import kotlin.text.get
 import kotlin.to
 
 /**
+ * Represents a snapshot of the game state at a particular point in time
+ */
+private data class GameStateSnapshot(
+    val board: Array<Array<Piece?>>,
+    val activeColor: PieceColor,
+    val castlingRights: String,
+    val enPassantTarget: Position?,
+    val halfMoveClock: Int,
+    val fullMoveNumber: Int
+) {
+    // Deep copy constructor
+    fun copy(): GameStateSnapshot {
+        val boardCopy = Array(8) { rank ->
+            Array(8) { file ->
+                board[rank][file]?.copy()
+            }
+        }
+        return GameStateSnapshot(
+            boardCopy,
+            activeColor,
+            castlingRights,
+            enPassantTarget?.copy(),
+            halfMoveClock,
+            fullMoveNumber
+        )
+    }
+}
+
+/**
  * Implementation of a chess game
  */
 class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChessGame {
@@ -25,8 +54,46 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     private var fullMoveNumber: Int = 1
     private val moveHistory: MutableList<Move> = mutableListOf()
     
+    // History of game states for undo functionality
+    private val stateHistory: MutableList<GameStateSnapshot> = mutableListOf()
+    
     init {
         reset()
+    }
+    
+    /**
+     * Create a snapshot of the current game state
+     */
+    private fun createSnapshot(): GameStateSnapshot {
+        val boardCopy = Array(8) { rank ->
+            Array(8) { file ->
+                board[rank][file]?.copy()
+            }
+        }
+        return GameStateSnapshot(
+            boardCopy,
+            activeColor,
+            castlingRights,
+            enPassantTarget?.copy(),
+            halfMoveClock,
+            fullMoveNumber
+        )
+    }
+    
+    /**
+     * Restore the game state from a snapshot
+     */
+    private fun restoreSnapshot(snapshot: GameStateSnapshot) {
+        board = Array(8) { rank ->
+            Array(8) { file ->
+                snapshot.board[rank][file]?.copy()
+            }
+        }
+        activeColor = snapshot.activeColor
+        castlingRights = snapshot.castlingRights
+        enPassantTarget = snapshot.enPassantTarget?.copy()
+        halfMoveClock = snapshot.halfMoveClock
+        fullMoveNumber = snapshot.fullMoveNumber
     }
     
     override fun reset() {
@@ -67,6 +134,10 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         halfMoveClock = 0
         fullMoveNumber = 1
         moveHistory.clear()
+        stateHistory.clear()
+        
+        // Save initial state
+        stateHistory.add(createSnapshot())
     }
     
     override fun getPieceAt(position: Position): Piece? {
@@ -112,6 +183,10 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         this.halfMoveClock = halfMoveClock
         this.fullMoveNumber = fullMoveNumber
         moveHistory.clear()
+        stateHistory.clear()
+        
+        // Save initial state
+        stateHistory.add(createSnapshot())
     }
     
     override fun importFEN(fen: String): Boolean {
@@ -164,6 +239,10 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
             fullMoveNumber = if (parts.size > 5) parts[5].toIntOrNull() ?: 1 else 1
             
             moveHistory.clear()
+            stateHistory.clear()
+            
+            // Save initial state
+            stateHistory.add(createSnapshot())
             return true
         } catch (e: Exception) {
             return false
@@ -305,6 +384,9 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         
         val isEnPassant = matchingMove.isEnPassant
         val isCastling = matchingMove.isCastling
+        
+        // Save current state before making the move
+        stateHistory.add(createSnapshot())
         
         // Determine captured piece (handle en passant)
         var capturedPiece: Piece? = if (isEnPassant) {
@@ -864,5 +946,57 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         }
         
         return null
+    }
+    
+    override fun undoLastMove(): Boolean {
+        // Need at least 2 states (initial + 1 move) to undo
+        if (stateHistory.size < 2 || moveHistory.isEmpty()) {
+            return false
+        }
+        
+        // Remove the last state (current state)
+        stateHistory.removeAt(stateHistory.size - 1)
+        
+        // Restore the previous state
+        val previousState = stateHistory.last()
+        restoreSnapshot(previousState)
+        
+        // Remove the last move from history
+        moveHistory.removeAt(moveHistory.size - 1)
+        
+        return true
+    }
+    
+    override fun undoToMove(moveNumber: Int): Boolean {
+        if (moveNumber < 0) {
+            return false
+        }
+        
+        // Move number 0 means undo all moves (return to initial state)
+        val targetHistorySize = moveNumber + 1 // +1 for initial state
+        
+        if (targetHistorySize > stateHistory.size) {
+            return false // Can't undo to a future move
+        }
+        
+        // Remove all states after the target
+        while (stateHistory.size > targetHistorySize) {
+            stateHistory.removeAt(stateHistory.size - 1)
+        }
+        
+        // Restore the target state
+        val targetState = stateHistory.last()
+        restoreSnapshot(targetState)
+        
+        // Trim move history to match
+        while (moveHistory.size > moveNumber) {
+            moveHistory.removeAt(moveHistory.size - 1)
+        }
+        
+        return true
+    }
+    
+    override fun getUndoCount(): Int {
+        return moveHistory.size
     }
 }

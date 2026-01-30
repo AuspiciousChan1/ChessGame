@@ -5,6 +5,7 @@
     <string name="empty_string"></string>
     <string name="switch_side">切换阵营</string>
     <string name="restart_game">重新开局</string>
+    <string name="undo_move">悔棋</string>
     <string name="chess_board_description">棋盘</string>
     <string name="game_record">棋谱</string>
     <string name="notation_empty_move">--</string>

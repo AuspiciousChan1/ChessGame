@@ -522,6 +522,13 @@ fun ChessScreen(
                     {
                         Button(
                             onClick = {
+                                onIntent(ChessIntent.UndoMove)
+                            }
+                        ) {
+                            Text(text = stringResource(id = R.string.undo_move))
+                        }
+                        Button(
+                            onClick = {
                                 val newColor =
                                     if (state.playerColor == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
                                 onIntent(ChessIntent.PlayerColorChanged(newColor))

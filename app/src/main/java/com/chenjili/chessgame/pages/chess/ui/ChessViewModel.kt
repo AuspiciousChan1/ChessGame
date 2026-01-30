@@ -45,6 +45,7 @@ sealed interface ChessIntent {
     data class PromotionPieceSelected(val pieceType: PieceType) : ChessIntent
     object PromotionCancelled : ChessIntent
     object GameOverDialogDismissed : ChessIntent
+    object UndoMove : ChessIntent
 }
 
 // MVI: State - 表示整个UI状态
@@ -157,6 +158,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             is ChessIntent.PromotionPieceSelected -> handlePromotionPieceSelected(intent.pieceType)
             is ChessIntent.PromotionCancelled -> handlePromotionCancelled()
             is ChessIntent.GameOverDialogDismissed -> handleGameOverDialogDismissed()
+            is ChessIntent.UndoMove -> handleUndoMove()
         }
     }
 
@@ -478,5 +480,54 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun handleGameOverDialogDismissed() {
 
+    }
+    
+    private fun handleUndoMove() {
+        if (chessGame.undoLastMove()) {
+            // Update the UI state to reflect the undone move
+            val currentState = _state.value
+            
+            // Rebuild pieces from the current board state
+            val allPieces = chessGame.getAllPieces()
+            var pieceId = 0
+            val updatedPieces = allPieces.map { (position, piece) ->
+                val displayColumn = if (currentState.playerColor == PieceColor.WHITE) {
+                    position.file
+                } else {
+                    7 - position.file
+                }
+                val displayRow = if (currentState.playerColor == PieceColor.WHITE) {
+                    position.rank
+                } else {
+                    7 - position.rank
+                }
+                ChessPieceDisplay(piece, displayColumn, displayRow, pieceId++)
+            }
+            
+            // Rebuild move history
+            val updatedMoveHistory = mutableListOf<ChessMove>()
+            val gameMoveHistory = chessGame.getMoveHistory()
+            for (move in gameMoveHistory) {
+                // Determine if the opponent is in check after this move
+                val isInCheck = false // We can't easily determine this without replaying moves
+                val moveNotation = getMoveNotation(move, isInCheck)
+                updatedMoveHistory.add(
+                    ChessMove(
+                        move = move,
+                        playerColor = currentState.playerColor,
+                        notation = moveNotation
+                    )
+                )
+            }
+            
+            val gameState = chessGame.getGameState()
+            
+            _state.value = currentState.copy(
+                pieces = updatedPieces,
+                selectedCell = null,
+                moveHistory = updatedMoveHistory,
+                gameState = gameState
+            )
+        }
     }
 }
