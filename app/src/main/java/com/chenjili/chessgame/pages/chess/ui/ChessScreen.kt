@@ -20,11 +20,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,11 +35,14 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,6 +77,31 @@ import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
+
+@Composable
+private fun WalnutActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, colorResource(R.color.walnut_dark)),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = colorResource(R.color.walnut_medium),
+            contentColor = Color.White
+        ),
+        contentPadding = ButtonDefaults.ContentPadding
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
 
 // 升变提示框
 @Composable
@@ -138,13 +168,12 @@ fun PromotionDialog(
                     )
 
                     val choices = listOf(
-                        PieceType.QUEEN to stringResource(R.string.queen),
-                        PieceType.ROOK to stringResource(R.string.rook),
-                        PieceType.BISHOP to stringResource(R.string.bishop),
-                        PieceType.KNIGHT to stringResource(R.string.knight),
+                        PieceType.QUEEN to R.string.queen,
+                        PieceType.ROOK to R.string.rook,
+                        PieceType.BISHOP to R.string.bishop,
+                        PieceType.KNIGHT to R.string.knight,
                     )
 
-                    // 根据弹窗可用宽度动态计算每个按钮宽度（2 列）
                     val gridGap = 12.dp
                     BoxWithConstraints(
                         modifier = Modifier.padding(vertical = 8.dp)
@@ -160,11 +189,11 @@ fun PromotionDialog(
                                     horizontalArrangement = Arrangement.spacedBy(gridGap),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    rowItems.forEach { (pieceType, name) ->
+                                    rowItems.forEach { (pieceType, nameSourceId) ->
                                         PromotionPieceButton(
                                             pieceType = pieceType,
                                             pieceColor = pieceColor,
-                                            name = name,
+                                            name = stringResource(nameSourceId),
                                             width = buttonWidth,
                                             onClick = {
                                                 showDialog.value = false
@@ -182,7 +211,7 @@ fun PromotionDialog(
     }
 }
 
-// 升变选项（如后，车，象，马）按钮
+// 升变选项按钮
 @Composable
 fun PromotionPieceButton(
     pieceType: PieceType,
@@ -204,7 +233,6 @@ fun PromotionPieceButton(
         label = "buttonScale"
     )
 
-    // 以按钮宽度为基准动态计算 UI 尺寸（带上下限，避免极端窗口）
     val wPx = with(density) { width.toPx() }.coerceAtLeast(1f)
 
     fun lerpPxToDp(minPx: Float, maxPx: Float, t: Float): Dp {
@@ -212,7 +240,6 @@ fun PromotionPieceButton(
         return with(density) { v.toDp() }
     }
 
-    // 以 96dp \~ 200dp 的宽度区间映射到 0..1
     val t = ((wPx - with(density) { 96.dp.toPx() }) /
             (with(density) { 200.dp.toPx() } - with(density) { 96.dp.toPx() }))
         .coerceIn(0f, 1f)
@@ -222,16 +249,11 @@ fun PromotionPieceButton(
     val paddingH = lerpPxToDp(minPx = 8f, maxPx = 14f, t = t)
     val paddingV = lerpPxToDp(minPx = 8f, maxPx = 14f, t = t)
 
-    // 图片大小：约等于按钮宽度的 0.55 \~ 0.62，并限制到合理范围
     val iconSize = with(density) {
         (wPx * (0.55f + 0.07f * t)).toDp().coerceIn(44.dp, 84.dp)
     }
 
-    // 字号随宽度线性增长，并限制范围
-    val labelSp = with(density) {
-        val sp = (10f + 4f * t) // 10sp \~ 14sp
-        sp
-    }
+    val labelSp = with(density) { (10f + 4f * t) }
     val topGap = lerpPxToDp(minPx = 4f, maxPx = 8f, t = t)
 
     val typeName = when (pieceType) {
@@ -243,7 +265,6 @@ fun PromotionPieceButton(
     }
     val colorName = if (pieceColor == PieceColor.WHITE) "white" else "black"
     val resName = "chess_piece_${colorName}_$typeName"
-
     val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
 
     Column(
@@ -365,45 +386,41 @@ fun ChessScreen(
                 val squareSize = minOf(maxW, maxH) - paddingDp * 2f
                 val density = LocalDensity.current
                 val context = LocalContext.current
-                val initialTopOffset = remember { (maxH - squareSize) / 2f }
 
-                // 背景图
                 Image(
                     painter = painterResource(id = R.drawable.bg_scholar_style),
                     contentDescription = null,
                     modifier = Modifier
-                        .matchParentSize()      // 占满 BoxWithConstraints 的可用区域，作为背景
+                        .matchParentSize()
                         .align(Alignment.Center),
-                    contentScale = ContentScale.Crop // 根据需要改为 Fit / FillBounds 等
+                    contentScale = ContentScale.Crop
                 )
 
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(paddingDp)
-                        .padding(top = initialTopOffset), // 固定顶部偏移，防止后续内容变化导致移动
+                        .padding(paddingDp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Top // 改为从顶部开始布局
-                )
-                {
-                    // 棋盘区
+                    verticalArrangement = Arrangement.Top
+                ) {
+                    // 棋盘贴上方
                     Box(
                         modifier = Modifier
+                            .padding(top = 8.dp)
                             .size(squareSize)
                             .onGloballyPositioned { coordinates ->
                                 val topLeft = coordinates.positionInWindow()
                                 val sizePx = coordinates.size
                                 with(density) {
-                                    val xDp = topLeft.x.toDp()
-                                    val yDp = topLeft.y.toDp()
-                                    val widthDp = sizePx.width.toDp()
-                                    val heightDp = sizePx.height.toDp()
-                                    onBoardLayoutChanged(xDp, yDp, widthDp, heightDp)
+                                    onBoardLayoutChanged(
+                                        topLeft.x.toDp(),
+                                        topLeft.y.toDp(),
+                                        sizePx.width.toDp(),
+                                        sizePx.height.toDp()
+                                    )
                                 }
                             }
-                    )
-                    {
-                        // 棋盘背景图
+                    ) {
                         Image(
                             painter = painterResource(id = R.drawable.chess_board_default),
                             contentDescription = "Chess board",
@@ -412,7 +429,7 @@ fun ChessScreen(
                                 .align(Alignment.TopStart)
                                 .rotate(if (state.playerColor == PieceColor.BLACK) 180f else 0f)
                         )
-                        // 计算格子与棋子尺寸
+
                         val cellDp = squareSize / 8f
                         val pieceDp = cellDp * 0.8f
                         val pieceOffsetInner = (cellDp - pieceDp) / 2f
@@ -422,7 +439,6 @@ fun ChessScreen(
                                 val targetX = (cellDp * pieceDisplay.column) + pieceOffsetInner
                                 val targetY = (cellDp * (7 - pieceDisplay.row)) + pieceOffsetInner
 
-                                // Animate the position with spring animation
                                 val animatedX by animateDpAsState(
                                     targetValue = targetX,
                                     animationSpec = spring(
@@ -431,7 +447,6 @@ fun ChessScreen(
                                     ),
                                     label = "pieceX_${pieceDisplay.id}"
                                 )
-
                                 val animatedY by animateDpAsState(
                                     targetValue = targetY,
                                     animationSpec = spring(
@@ -466,11 +481,9 @@ fun ChessScreen(
                             }
                         }
 
-                        // Render semi-transparent light green overlay on selected cell
                         state.selectedCell?.let { (selectedColumn, selectedRow) ->
                             val overlayX = cellDp * selectedColumn
                             val overlayY = cellDp * (7 - selectedRow)
-
                             Box(
                                 modifier = Modifier
                                     .size(cellDp)
@@ -480,7 +493,6 @@ fun ChessScreen(
                             )
                         }
 
-                        // 2) 透明点击层（放在最上面，覆盖整个棋盘）
                         val boardSizePx = with(LocalDensity.current) { squareSize.toPx() }
                         val cellSizePx = boardSizePx / 8f
 
@@ -491,111 +503,111 @@ fun ChessScreen(
                                     detectTapGestures { tap: Offset ->
                                         val x = tap.x.coerceIn(0f, boardSizePx - 0.001f)
                                         val y = tap.y.coerceIn(0f, boardSizePx - 0.001f)
-
                                         val colFromLeft = (x / cellSizePx).toInt().coerceIn(0, 7)
                                         val rowFromTop = (y / cellSizePx).toInt().coerceIn(0, 7)
-
-                                        // 你的绘制：y = cell * (7 - row)，所以 row = 7 - rowFromTop
                                         val column = colFromLeft
                                         val row = 7 - rowFromTop
-
-                                        onIntent(
-                                            ChessIntent.BoardCellClicked(
-                                                column,
-                                                row,
-                                                state.playerColor
-                                            )
-                                        )
+                                        onIntent(ChessIntent.BoardCellClicked(column, row, state.playerColor))
                                     }
                                 }
                         )
                     }
-                    // 功能区：如切换阵营
-                    Row(
+
+                    // 胡桃木风格的横向滚动工具条，预留空间
+                    Box(
                         modifier = Modifier
-                            .size(squareSize, 48.dp)
-                            .padding(top = 12.dp),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    )
-                    {
-                        Button(
-                            onClick = {
-                                onIntent(ChessIntent.UndoMove)
-                            }
+                            .padding(top = 12.dp)
+                            .widthIn(max = squareSize)
+                            .fillMaxWidth()
+                            .shadow(10.dp, RoundedCornerShape(14.dp))
+                            .background(colorResource(R.color.walnut_light), RoundedCornerShape(14.dp))
+                            .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = stringResource(id = R.string.undo_move))
-                        }
-                        Button(
-                            onClick = {
-                                val newColor =
-                                    if (state.playerColor == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
-                                onIntent(ChessIntent.PlayerColorChanged(newColor))
-                            }
-                        ) {
-                            Text(text = stringResource(id = R.string.switch_side))
-                        }
-                        Button(
-                            onClick = {
-                                onIntent(ChessIntent.RestartGame(state.playerColor))
-                            }
-                        ) {
-                            Text(text = stringResource(id = R.string.restart_game))
+                            WalnutActionButton(
+                                text = stringResource(id = R.string.undo_move),
+                                onClick = { onIntent(ChessIntent.UndoMove) }
+                            )
+                            WalnutActionButton(
+                                text = stringResource(id = R.string.switch_side),
+                                onClick = {
+                                    val newColor =
+                                        if (state.playerColor == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
+                                    onIntent(ChessIntent.PlayerColorChanged(newColor))
+                                }
+                            )
+                            WalnutActionButton(
+                                text = stringResource(id = R.string.restart_game),
+                                onClick = { onIntent(ChessIntent.RestartGame(state.playerColor)) }
+                            )
+
+                            Spacer(modifier = Modifier.width(24.dp))
                         }
                     }
 
-                    // 棋谱区
+                    // 棋谱区变窄：比棋盘窄的居中卡片
                     if (state.moveHistory.isNotEmpty()) {
+                        val notationEmptyMove = stringResource(R.string.notation_empty_move)
+                        val movePairs = remember(state.moveHistory) {
+                            val moves = state.moveHistory
+                            val triples = ArrayList<Triple<Int, String, String>>()
+                            var moveNum = 1
+                            var whiteCache = ""
+                            for (move in moves) {
+                                val notation = move.notation
+                                val pieceColor = move.move.piece.color
+                                when (pieceColor) {
+                                    PieceColor.WHITE -> {
+                                        if (whiteCache.isNotEmpty()) {
+                                            triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
+                                            ++moveNum
+                                        }
+                                        whiteCache = notation
+                                    }
+                                    PieceColor.BLACK -> {
+                                        val whiteNotation = if (whiteCache.isNotEmpty()) whiteCache else notationEmptyMove
+                                        triples.add(Triple(moveNum, whiteNotation, notation))
+                                        whiteCache = ""
+                                        ++moveNum
+                                    }
+                                }
+                            }
+                            if (whiteCache.isNotEmpty()) {
+                                triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
+                            }
+                            triples
+                        }
+
                         Column(
                             modifier = Modifier
-                                .size(squareSize, 200.dp)
-                                .padding(top = 8.dp)
+                                .padding(top = 12.dp)
+                                .widthIn(max = squareSize * 0.78f)
+                                .fillMaxWidth()
+                                .shadow(10.dp, RoundedCornerShape(14.dp))
+                                .background(colorResource(R.color.walnut_medium), RoundedCornerShape(14.dp))
+                                .border(BorderStroke(1.dp, colorResource(R.color.walnut_dark)), RoundedCornerShape(14.dp))
+                                .padding(10.dp)
                         ) {
                             Text(
                                 text = stringResource(R.string.game_record),
-                                modifier = Modifier.padding(bottom = 4.dp)
+                                color = Color.White,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                                fontWeight = FontWeight.SemiBold
                             )
-
-                            // 预处理：把 moveHistory 的 notation 按两步一组转换为 (moveNumber, white, black)
-                            val notationEmptyMove = stringResource(R.string.notation_empty_move)
-                            val movePairs = remember(state.moveHistory) {
-                                val moves = state.moveHistory
-                                val triples = ArrayList<Triple<Int, String, String>>()
-                                var moveNum = 1
-                                var whiteCache: String = ""
-                                for (move in moves) {
-                                    val notation = move.notation
-                                    val pieceColor = move.move.piece.color
-                                    when(pieceColor) {
-                                        PieceColor.WHITE -> {
-                                            if (whiteCache.isNotEmpty()) {
-                                                // 上一步白棋未配对，补全黑棋为 "--"
-                                                triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
-                                                ++moveNum
-                                            }
-                                            // 记录当前的白棋走子
-                                            whiteCache = notation
-                                        }
-                                        PieceColor.BLACK -> {
-                                            val whiteNotation = if (whiteCache.isNotEmpty()) whiteCache else notationEmptyMove
-                                            triples.add(Triple(moveNum, whiteNotation, notation))
-                                            whiteCache = ""
-                                            ++moveNum
-                                        }
-                                    }
-                                }
-                                if (whiteCache.isNotEmpty()) {
-                                    // 最后一步是白棋，补全黑棋为 "--"
-                                    triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
-                                }
-                                triples
-                            }
 
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(180.dp)
-                                    .background(Color(0xFFF5F5F5))
+                                    .background(colorResource(R.color.walnut_light), RoundedCornerShape(10.dp))
+                                    .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(10.dp))
                                     .padding(8.dp),
                                 state = rememberLazyListState()
                             ) {
@@ -606,28 +618,20 @@ fun ChessScreen(
                                             .padding(vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // 序号列
                                         Text(
                                             text = "$num.",
-                                            modifier = Modifier
-                                                .weight(0.15f)
-                                                .padding(start = 4.dp),
+                                            modifier = Modifier.weight(0.16f),
+                                            color = Color.White
                                         )
-
-                                        // 白棋列（中间）
                                         Text(
                                             text = whiteMove,
-                                            modifier = Modifier
-                                                .weight(0.425f)
-                                                .padding(start = 8.dp),
+                                            modifier = Modifier.weight(0.42f),
+                                            color = Color.White
                                         )
-
-                                        // 黑棋列（右）
                                         Text(
                                             text = blackMove,
-                                            modifier = Modifier
-                                                .weight(0.425f)
-                                                .padding(start = 8.dp),
+                                            modifier = Modifier.weight(0.42f),
+                                            color = Color.White
                                         )
                                     }
                                 }
@@ -635,19 +639,17 @@ fun ChessScreen(
                         }
                     }
                 }
-                
-                // Show promotion dialog when there's a pending promotion
+
                 state.pendingPromotion?.let { pendingPromotion ->
                     PromotionDialog(
                         pieceColor = pendingPromotion.pieceColor,
                         onPieceSelected = { pieceType ->
                             onIntent(ChessIntent.PromotionPieceSelected(pieceType))
                         },
-                        onDismiss = {
-                            onIntent(ChessIntent.PromotionCancelled)
-                        }
+                        onDismiss = { onIntent(ChessIntent.PromotionCancelled) }
                     )
                 }
+
                 state.gameState?.let { gameState ->
                     if (gameState.isGameOver()) {
                         val gameOverTipId = when (gameState) {
@@ -661,9 +663,7 @@ fun ChessScreen(
                         }
                         GameOverDialog(
                             text = stringResource(gameOverTipId),
-                            onDismiss = {
-                                onIntent(ChessIntent.GameOverDialogDismissed)
-                            }
+                            onDismiss = { onIntent(ChessIntent.GameOverDialogDismissed) }
                         )
                     }
                 }
