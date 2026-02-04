@@ -126,6 +126,18 @@ interface IChessGame {
      * @return Number of half-moves in history
      */
     fun getUndoCount(): Int
+
+    /**
+     * 投降
+     * @param color 投降方颜色
+     * @return true 表示投降成功
+     */
+    fun resign(color: PieceColor): Boolean
+
+    /**
+     *
+     */
+    fun getResignedColor(): PieceColor?
     
     /**
      * Reset the game to initial position

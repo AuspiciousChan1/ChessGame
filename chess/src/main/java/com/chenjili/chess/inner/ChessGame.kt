@@ -61,6 +61,9 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     // Note: This creates a deep copy of the board for each move, which could consume memory in very long games.
     // Consider implementing a maximum history size or delta-based storage for production use.
     private val stateHistory: MutableList<GameStateSnapshot> = mutableListOf()
+
+    // 投降方（null 表示无人投降）
+    private var resignedColor: PieceColor? = null
     
     init {
         reset()
@@ -143,6 +146,7 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         
         // Save initial state
         stateHistory.add(createSnapshot())
+        resignedColor = null
     }
     
     override fun getPieceAt(position: Position): Piece? {
@@ -192,7 +196,25 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         
         // Save initial state
         stateHistory.add(createSnapshot())
+
+        resignedColor = null
     }
+
+    /**
+     * 指定颜色投降\.
+     * 返回 true 表示成功；若已结束（已投降或将死/和棋等）则返回 false\.
+     */
+    override fun resign(color: PieceColor): Boolean {
+        if (resignedColor != null) return false
+        if (getGameState().isGameOver()) return false
+        resignedColor = color
+        return true
+    }
+
+    /**
+     * 是否已经有人投降\.
+     */
+    override fun getResignedColor(): PieceColor? = resignedColor
     
     override fun importFEN(fen: String): Boolean {
         try {
@@ -799,6 +821,15 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     }
     
     override fun getGameState(): GameState {
+        // 0\) 投降优先
+        resignedColor?.let { color ->
+            return if (color == PieceColor.WHITE) {
+                GameState.CHECKMATE_BLACK_WINS
+            } else {
+                GameState.CHECKMATE_WHITE_WINS
+            }
+        }
+
         val hasLegalMoves = getLegalMoves().isNotEmpty()
         
         if (!hasLegalMoves) {
