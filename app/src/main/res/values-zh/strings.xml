@@ -37,4 +37,8 @@
     <string name="game_state_desc_draw_by_insufficient_material">和棋 棋子不足</string>
     <string name="game_state_desc_draw_by_fifty_move_rule">和棋 50回合规则</string>
     <string name="game_state_desc_draw_by_threefold_repetition">和棋 三次重复</string>
+    <string name="surrender">投降</string>
+    <string name="choose_surrendering_side">选择要投降的一方</string>
+    <string name="white_surrenders">白方投降</string>
+    <string name="black_surrenders">黑方投降</string>
 </resources>

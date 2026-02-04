@@ -1,6 +1,7 @@
 package com.chenjili.chessgame.pages.chess.ui
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.chenjili.chess.api.ChessServiceFactory
@@ -46,6 +47,11 @@ sealed interface ChessIntent {
     object PromotionCancelled : ChessIntent
     object GameOverDialogDismissed : ChessIntent
     object UndoMove : ChessIntent
+    // 点击投降按钮
+    object SurrenderClicked : ChessIntent
+    data class SurrenderConfirmed(val playerColor: PieceColor) : ChessIntent
+    // 取消投降
+    object SurrenderCancelled : ChessIntent
 }
 
 // MVI: State - 表示整个UI状态
@@ -55,10 +61,15 @@ data class ChessState(
     val selectedCell: Pair<Int, Int>? = null, // (column, row) of the selected cell
     val moveHistory: List<ChessMove> = emptyList(), // History of all moves
     val gameState: GameState = GameState.IN_PROGRESS, // 游戏状态
-    val pendingPromotion: PendingPromotion? = null // Pending promotion awaiting user choice
+    val pendingPromotion: PendingPromotion? = null, // Pending promotion awaiting user choice
+    val showSurrenderDialog: Boolean = false, // 是否展示投降确认框
 )
 
 class ChessViewModel(application: Application) : AndroidViewModel(application) {
+
+    companion object {
+        const val TAG = "ChessViewModel"
+    }
 
     private lateinit var chessGame: IChessGame
     private val _state = MutableStateFlow(ChessState())
@@ -159,6 +170,9 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             is ChessIntent.PromotionCancelled -> handlePromotionCancelled()
             is ChessIntent.GameOverDialogDismissed -> handleGameOverDialogDismissed()
             is ChessIntent.UndoMove -> handleUndoMove()
+            is ChessIntent.SurrenderClicked -> handleSurrenderClicked()
+            is ChessIntent.SurrenderConfirmed -> handleSurrenderConfirmed(intent.playerColor)
+            is ChessIntent.SurrenderCancelled -> handleSurrenderCancelled()
         }
     }
 
@@ -518,6 +532,21 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 pendingPromotion = null
             )
         }
+    }
+
+    private fun handleSurrenderClicked() {
+        _state.value = _state.value.copy(showSurrenderDialog = true)
+    }
+
+    private fun handleSurrenderConfirmed(playerColor: PieceColor) {
+        chessGame.resign(playerColor)
+        val gameState: GameState = chessGame.getGameState()
+        val showSurrenderDialog = false
+        _state.value = _state.value.copy(gameState = gameState, showSurrenderDialog = showSurrenderDialog)
+    }
+
+    private fun handleSurrenderCancelled() {
+        _state.value = _state.value.copy(showSurrenderDialog = false)
     }
 
     /**

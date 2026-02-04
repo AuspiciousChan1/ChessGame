@@ -367,6 +367,79 @@ fun GameOverDialog(text: String, onDismiss: () -> Unit) {
     }
 }
 
+// 投降对话框
+@Composable
+fun SurrenderDialog(
+    onSurrenderConfirmed: (PieceColor) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val showDialog = remember { mutableStateOf(true) }
+
+    AnimatedVisibility(
+        visible = showDialog.value,
+        enter = fadeIn(animationSpec = tween(250)) + scaleIn(initialScale = 0.9f),
+        exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.9f)
+    ) {
+        Dialog(
+            onDismissRequest = {
+                showDialog.value = false
+                onDismiss()
+            },
+            properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
+        ) {
+            Box(
+                modifier = Modifier
+                    .shadow(14.dp, RoundedCornerShape(14.dp))
+                    .background(color = colorResource(R.color.walnut_medium), shape = RoundedCornerShape(14.dp))
+                    .border(BorderStroke(2.dp, colorResource(R.color.walnut_dark)), shape = RoundedCornerShape(14.dp))
+                    .padding(20.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = stringResource(R.string.surrender),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorResource(R.color.walnut_accent)
+                    )
+
+                    Text(
+                        text = stringResource(R.string.choose_surrendering_side),
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        WalnutActionButton(
+                            text = stringResource(R.string.white_surrenders),
+                            onClick = {
+                                showDialog.value = false
+                                onSurrenderConfirmed(PieceColor.WHITE)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        WalnutActionButton(
+                            text = stringResource(R.string.black_surrenders),
+                            onClick = {
+                                showDialog.value = false
+                                onSurrenderConfirmed(PieceColor.BLACK)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun ChessScreen(
     paddingDp: Dp = 8.dp,
@@ -547,6 +620,10 @@ fun ChessScreen(
                                 text = stringResource(id = R.string.restart_game),
                                 onClick = { onIntent(ChessIntent.RestartGame(state.playerColor)) }
                             )
+                            WalnutActionButton(
+                                text = stringResource(id = R.string.surrender),
+                                onClick = { onIntent(ChessIntent.SurrenderClicked) }
+                            )
 
                             Spacer(modifier = Modifier.width(24.dp))
                         }
@@ -666,6 +743,15 @@ fun ChessScreen(
                             onDismiss = { onIntent(ChessIntent.GameOverDialogDismissed) }
                         )
                     }
+                }
+
+                if (state.showSurrenderDialog) {
+                    SurrenderDialog(
+                        onSurrenderConfirmed = { color ->
+                            onIntent(ChessIntent.SurrenderConfirmed(color))
+                        },
+                        onDismiss = { onIntent(ChessIntent.SurrenderCancelled) }
+                    )
                 }
             }
         }

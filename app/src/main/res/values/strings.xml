@@ -36,4 +36,8 @@
     <string name="game_state_desc_draw_by_insufficient_material">draw by insufficient material</string>
     <string name="game_state_desc_draw_by_fifty_move_rule">draw by fifty move rule</string>
     <string name="game_state_desc_draw_by_threefold_repetition">draw by threefold repetition</string>
+    <string name="surrender">Surrender</string>
+    <string name="choose_surrendering_side">Choose which side surrenders:</string>
+    <string name="white_surrenders">White Surrenders</string>
+    <string name="black_surrenders">Black Surrenders</string>
 </resources>
