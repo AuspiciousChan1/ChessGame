@@ -79,6 +79,9 @@ class MenuViewModel(application: Application): AndroidViewModel(application) {
             }
             ItemRouteType.SINGLE_PLAYER -> {
                 // 导航到单人游戏
+            }
+            ItemRouteType.MULTI_PLAYER -> {
+                // 导航到多人游戏
                 viewModelScope.launch {
                     _effect.emit(
                         MenuEffect.NavigateTo(
@@ -87,9 +90,6 @@ class MenuViewModel(application: Application): AndroidViewModel(application) {
                         )
                     )
                 }
-            }
-            ItemRouteType.MULTI_PLAYER -> {
-                // 导航到多人游戏
             }
             ItemRouteType.SETTINGS -> {
                 // 导航到设置
