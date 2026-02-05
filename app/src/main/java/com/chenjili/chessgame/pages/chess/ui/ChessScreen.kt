@@ -20,13 +20,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,13 +39,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -440,6 +440,7 @@ fun SurrenderDialog(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChessScreen(
     paddingDp: Dp = 8.dp,
@@ -597,12 +598,10 @@ fun ChessScreen(
                             .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(14.dp))
                             .padding(horizontal = 10.dp, vertical = 8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             WalnutActionButton(
                                 text = stringResource(id = R.string.undo_move),
@@ -624,93 +623,96 @@ fun ChessScreen(
                                 text = stringResource(id = R.string.surrender),
                                 onClick = { onIntent(ChessIntent.SurrenderClicked) }
                             )
-
-                            Spacer(modifier = Modifier.width(24.dp))
                         }
                     }
 
                     // 棋谱区变窄：比棋盘窄的居中卡片
-                    if (state.moveHistory.isNotEmpty()) {
-                        val notationEmptyMove = stringResource(R.string.notation_empty_move)
-                        val movePairs = remember(state.moveHistory) {
-                            val moves = state.moveHistory
-                            val triples = ArrayList<Triple<Int, String, String>>()
-                            var moveNum = 1
-                            var whiteCache = ""
-                            for (move in moves) {
-                                val notation = move.notation
-                                val pieceColor = move.move.piece.color
-                                when (pieceColor) {
-                                    PieceColor.WHITE -> {
-                                        if (whiteCache.isNotEmpty()) {
-                                            triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
-                                            ++moveNum
-                                        }
-                                        whiteCache = notation
-                                    }
-                                    PieceColor.BLACK -> {
-                                        val whiteNotation = if (whiteCache.isNotEmpty()) whiteCache else notationEmptyMove
-                                        triples.add(Triple(moveNum, whiteNotation, notation))
-                                        whiteCache = ""
+                    val notationEmptyMove = stringResource(R.string.notation_empty_move)
+                    val movePairs = remember(state.moveHistory) {
+                        val moves = state.moveHistory
+                        val triples = ArrayList<Triple<Int, String, String>>()
+                        var moveNum = 1
+                        var whiteCache = ""
+                        for (move in moves) {
+                            val notation = move.notation
+                            val pieceColor = move.move.piece.color
+                            when (pieceColor) {
+                                PieceColor.WHITE -> {
+                                    if (whiteCache.isNotEmpty()) {
+                                        triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
                                         ++moveNum
                                     }
+                                    whiteCache = notation
+                                }
+                                PieceColor.BLACK -> {
+                                    val whiteNotation = if (whiteCache.isNotEmpty()) whiteCache else notationEmptyMove
+                                    triples.add(Triple(moveNum, whiteNotation, notation))
+                                    whiteCache = ""
+                                    ++moveNum
                                 }
                             }
-                            if (whiteCache.isNotEmpty()) {
-                                triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
-                            }
-                            triples
                         }
+                        if (whiteCache.isNotEmpty()) {
+                            triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
+                        }
+                        triples
+                    }
 
-                        Column(
+                    val lazyListState = rememberLazyListState()
+                    LaunchedEffect(movePairs.size) {
+                        if (movePairs.isNotEmpty()) {
+                            lazyListState.animateScrollToItem(movePairs.lastIndex)
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .widthIn(max = squareSize * 0.78f)
+                            .fillMaxWidth()
+                            .shadow(10.dp, RoundedCornerShape(14.dp))
+                            .background(colorResource(R.color.walnut_medium), RoundedCornerShape(14.dp))
+                            .border(BorderStroke(1.dp, colorResource(R.color.walnut_dark)), RoundedCornerShape(14.dp))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.game_record),
+                            color = Color.White,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        LazyColumn(
                             modifier = Modifier
-                                .padding(top = 12.dp)
-                                .widthIn(max = squareSize * 0.78f)
                                 .fillMaxWidth()
-                                .shadow(10.dp, RoundedCornerShape(14.dp))
-                                .background(colorResource(R.color.walnut_medium), RoundedCornerShape(14.dp))
-                                .border(BorderStroke(1.dp, colorResource(R.color.walnut_dark)), RoundedCornerShape(14.dp))
-                                .padding(10.dp)
+                                .height(180.dp)
+                                .background(colorResource(R.color.walnut_light), RoundedCornerShape(10.dp))
+                                .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(10.dp))
+                                .padding(8.dp),
+                            state = lazyListState
                         ) {
-                            Text(
-                                text = stringResource(R.string.game_record),
-                                color = Color.White,
-                                modifier = Modifier.padding(bottom = 8.dp),
-                                fontWeight = FontWeight.SemiBold
-                            )
-
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(180.dp)
-                                    .background(colorResource(R.color.walnut_light), RoundedCornerShape(10.dp))
-                                    .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(10.dp))
-                                    .padding(8.dp),
-                                state = rememberLazyListState()
-                            ) {
-                                items(movePairs) { (num, whiteMove, blackMove) ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "$num.",
-                                            modifier = Modifier.weight(0.16f),
-                                            color = Color.White
-                                        )
-                                        Text(
-                                            text = whiteMove,
-                                            modifier = Modifier.weight(0.42f),
-                                            color = Color.White
-                                        )
-                                        Text(
-                                            text = blackMove,
-                                            modifier = Modifier.weight(0.42f),
-                                            color = Color.White
-                                        )
-                                    }
+                            items(movePairs) { (num, whiteMove, blackMove) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "$num.",
+                                        modifier = Modifier.weight(0.16f),
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = whiteMove,
+                                        modifier = Modifier.weight(0.42f),
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = blackMove,
+                                        modifier = Modifier.weight(0.42f),
+                                        color = Color.White
+                                    )
                                 }
                             }
                         }
