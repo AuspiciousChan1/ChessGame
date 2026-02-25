@@ -45,10 +45,10 @@ class MenuViewModel(application: Application): AndroidViewModel(application) {
             _state.value = MenuState(
                 menuItems = arrayListOf(
                     Item(R.string.activity_menu_item_edit_mode, ItemRouteType.EDIT_MODE),
-                    Item(R.string.activity_menu_item_single, ItemRouteType.SINGLE_PLAYER),
+//                    Item(R.string.activity_menu_item_single, ItemRouteType.SINGLE_PLAYER),
                     Item(R.string.activity_menu_item_two_player, ItemRouteType.MULTI_PLAYER),
-                    Item(R.string.activity_menu_item_settings, ItemRouteType.SETTINGS),
-                    Item(R.string.activity_menu_item_about, ItemRouteType.ABOUT)
+//                    Item(R.string.activity_menu_item_settings, ItemRouteType.SETTINGS),
+//                    Item(R.string.activity_menu_item_about, ItemRouteType.ABOUT)
                 )
             )
         }

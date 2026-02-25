@@ -619,10 +619,10 @@ fun ChessScreen(
                                 text = stringResource(id = R.string.restart_game),
                                 onClick = { onIntent(ChessIntent.RestartGame(state.playerColor)) }
                             )
-                            WalnutActionButton(
-                                text = stringResource(id = R.string.surrender),
-                                onClick = { onIntent(ChessIntent.SurrenderClicked) }
-                            )
+//                            WalnutActionButton(
+//                                text = stringResource(id = R.string.surrender),
+//                                onClick = { onIntent(ChessIntent.SurrenderClicked) }
+//                            )
                         }
                     }
 
