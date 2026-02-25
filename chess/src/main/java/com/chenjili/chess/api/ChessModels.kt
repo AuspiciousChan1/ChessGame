@@ -107,5 +107,9 @@ enum class GameState {
     STALEMATE,
     DRAW_BY_INSUFFICIENT_MATERIAL,
     DRAW_BY_FIFTY_MOVE_RULE,
-    DRAW_BY_THREEFOLD_REPETITION
+    DRAW_BY_THREEFOLD_REPETITION,
+    ;
+    fun isGameOver(): Boolean {
+        return this != IN_PROGRESS
+    }
 }

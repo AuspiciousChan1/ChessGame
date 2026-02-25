@@ -3,11 +3,43 @@ package com.chenjili.chess.inner
 import com.chenjili.chess.api.*
 import java.util.UUID
 import kotlin.collections.get
+import kotlin.compareTo
 import kotlin.div
 import kotlin.inc
 import kotlin.text.compareTo
 import kotlin.text.get
 import kotlin.to
+
+/**
+ * Represents a snapshot of the game state at a particular point in time
+ * Note: This data class contains an Array field which uses referential equality.
+ * Do not rely on default equals()/hashCode() for comparing snapshots.
+ */
+private data class GameStateSnapshot(
+    val board: Array<Array<Piece?>>,
+    val activeColor: PieceColor,
+    val castlingRights: String,
+    val enPassantTarget: Position?,
+    val halfMoveClock: Int,
+    val fullMoveNumber: Int
+) {
+    // Deep copy constructor
+    fun copy(): GameStateSnapshot {
+        val boardCopy = Array(8) { rank ->
+            Array(8) { file ->
+                board[rank][file]?.copy()
+            }
+        }
+        return GameStateSnapshot(
+            boardCopy,
+            activeColor,
+            castlingRights,
+            enPassantTarget?.copy(),
+            halfMoveClock,
+            fullMoveNumber
+        )
+    }
+}
 
 /**
  * Implementation of a chess game
@@ -25,8 +57,51 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     private var fullMoveNumber: Int = 1
     private val moveHistory: MutableList<Move> = mutableListOf()
     
+    // History of game states for undo functionality
+    // Note: This creates a deep copy of the board for each move, which could consume memory in very long games.
+    // Consider implementing a maximum history size or delta-based storage for production use.
+    private val stateHistory: MutableList<GameStateSnapshot> = mutableListOf()
+
+    // 投降方（null 表示无人投降）
+    private var resignedColor: PieceColor? = null
+    
     init {
         reset()
+    }
+    
+    /**
+     * Create a snapshot of the current game state
+     */
+    private fun createSnapshot(): GameStateSnapshot {
+        val boardCopy = Array(8) { rank ->
+            Array(8) { file ->
+                board[rank][file]?.copy()
+            }
+        }
+        return GameStateSnapshot(
+            boardCopy,
+            activeColor,
+            castlingRights,
+            enPassantTarget?.copy(),
+            halfMoveClock,
+            fullMoveNumber
+        )
+    }
+    
+    /**
+     * Restore the game state from a snapshot
+     */
+    private fun restoreSnapshot(snapshot: GameStateSnapshot) {
+        board = Array(8) { rank ->
+            Array(8) { file ->
+                snapshot.board[rank][file]?.copy()
+            }
+        }
+        activeColor = snapshot.activeColor
+        castlingRights = snapshot.castlingRights
+        enPassantTarget = snapshot.enPassantTarget?.copy()
+        halfMoveClock = snapshot.halfMoveClock
+        fullMoveNumber = snapshot.fullMoveNumber
     }
     
     override fun reset() {
@@ -67,6 +142,11 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         halfMoveClock = 0
         fullMoveNumber = 1
         moveHistory.clear()
+        stateHistory.clear()
+        
+        // Save initial state
+        stateHistory.add(createSnapshot())
+        resignedColor = null
     }
     
     override fun getPieceAt(position: Position): Piece? {
@@ -112,7 +192,29 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         this.halfMoveClock = halfMoveClock
         this.fullMoveNumber = fullMoveNumber
         moveHistory.clear()
+        stateHistory.clear()
+        
+        // Save initial state
+        stateHistory.add(createSnapshot())
+
+        resignedColor = null
     }
+
+    /**
+     * 指定颜色投降\.
+     * 返回 true 表示成功；若已结束（已投降或将死/和棋等）则返回 false\.
+     */
+    override fun resign(color: PieceColor): Boolean {
+        if (resignedColor != null) return false
+        if (getGameState().isGameOver()) return false
+        resignedColor = color
+        return true
+    }
+
+    /**
+     * 是否已经有人投降\.
+     */
+    override fun getResignedColor(): PieceColor? = resignedColor
     
     override fun importFEN(fen: String): Boolean {
         try {
@@ -164,6 +266,10 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
             fullMoveNumber = if (parts.size > 5) parts[5].toIntOrNull() ?: 1 else 1
             
             moveHistory.clear()
+            stateHistory.clear()
+            
+            // Save initial state
+            stateHistory.add(createSnapshot())
             return true
         } catch (e: Exception) {
             return false
@@ -305,16 +411,15 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         
         val isEnPassant = matchingMove.isEnPassant
         val isCastling = matchingMove.isCastling
-        
-        // Determine captured piece (handle en passant)
-        var capturedPiece: Piece? = if (isEnPassant) {
-            // The captured pawn is on the same rank as 'from' and in file 'to.file'
+
+        // 记录被捕获的棋子
+        val capturedPiece: Piece? = if (isEnPassant) {
             getPieceAt(Position(to.file, from.rank))
         } else {
             getPieceAt(to)
         }
 
-        // Execute move
+        // 执行移动逻辑
         board[from.rank][from.file] = null
         
         if (isCastling) {
@@ -346,8 +451,8 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
                 board[to.rank][to.file] = piece
             }
         }
-        
-        // Update castling rights
+
+        // 更新游戏状态变量
         updateCastlingRights(piece, from)
         
         // Update en passant target
@@ -369,6 +474,10 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         activeColor = if (activeColor == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
         
         // Record move
+
+        // 在所有变量更新完成后，记录当前状态快照
+        stateHistory.add(createSnapshot())
+
         val move = Move(from, to, piece, capturedPiece, isEnPassant, isCastling, finalPromotionPiece)
         moveHistory.add(move)
         
@@ -712,6 +821,15 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     }
     
     override fun getGameState(): GameState {
+        // 0\) 投降优先
+        resignedColor?.let { color ->
+            return if (color == PieceColor.WHITE) {
+                GameState.CHECKMATE_BLACK_WINS
+            } else {
+                GameState.CHECKMATE_WHITE_WINS
+            }
+        }
+
         val hasLegalMoves = getLegalMoves().isNotEmpty()
         
         if (!hasLegalMoves) {
@@ -864,5 +982,48 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         }
         
         return null
+    }
+    
+    override fun undoLastMove(): Boolean {
+        // moveHistory.size 与 stateHistory.size - 1 保持同步
+        if (moveHistory.isEmpty() || stateHistory.size < 2) {
+            return false
+        }
+
+        // 1. 移除当前最新的快照
+        stateHistory.removeAt(stateHistory.size - 1)
+
+        // 2. 恢复到移除后的最后一个快照（即上一步之后的状态或初始状态）
+        restoreSnapshot(stateHistory.last())
+
+        // 3. 移除移动记录
+        moveHistory.removeAt(moveHistory.size - 1)
+        
+        return true
+    }
+    
+    override fun undoToMove(moveNumber: Int): Boolean {
+        if (moveNumber < 0 || moveNumber > moveHistory.size) {
+            return false
+        }
+
+        // 目标快照库大小：初始状态(1) + 保留的移动步数(moveNumber)
+        val targetSize = moveNumber + 1
+
+        while (stateHistory.size > targetSize) {
+            stateHistory.removeAt(stateHistory.size - 1)
+        }
+
+        restoreSnapshot(stateHistory.last())
+
+        while (moveHistory.size > moveNumber) {
+            moveHistory.removeAt(moveHistory.size - 1)
+        }
+        
+        return true
+    }
+    
+    override fun getUndoCount(): Int {
+        return moveHistory.size
     }
 }

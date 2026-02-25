@@ -340,4 +340,218 @@ class ChessGameTest {
         assertEquals(0, game.getMoveHistory().size)
         assertEquals(PieceColor.WHITE, game.getActiveColor())
     }
+    
+    @Test
+    fun testUndoLastMove() {
+        // Make a move
+        val e2 = Position.fromAlgebraic("e2")!!
+        val e4 = Position.fromAlgebraic("e4")!!
+        game.makeMove(e2, e4)
+        
+        // Verify move was made
+        assertNull(game.getPieceAt(e2))
+        assertEquals(PieceType.PAWN, game.getPieceAt(e4)?.type)
+        assertEquals(1, game.getMoveHistory().size)
+        assertEquals(PieceColor.BLACK, game.getActiveColor())
+        
+        // Undo the move
+        assertTrue(game.undoLastMove())
+        
+        // Verify position restored
+        assertEquals(PieceType.PAWN, game.getPieceAt(e2)?.type)
+        assertNull(game.getPieceAt(e4))
+        assertEquals(0, game.getMoveHistory().size)
+        assertEquals(PieceColor.WHITE, game.getActiveColor())
+    }
+    
+    @Test
+    fun testUndoMultipleMoves() {
+        // Make several moves
+        game.makeMove(Position.fromAlgebraic("e2")!!, Position.fromAlgebraic("e4")!!)
+        game.makeMove(Position.fromAlgebraic("e7")!!, Position.fromAlgebraic("e5")!!)
+        game.makeMove(Position.fromAlgebraic("g1")!!, Position.fromAlgebraic("f3")!!)
+        
+        assertEquals(3, game.getMoveHistory().size)
+        
+        // Undo last move
+        assertTrue(game.undoLastMove())
+        assertEquals(2, game.getMoveHistory().size)
+        assertNull(game.getPieceAt(Position.fromAlgebraic("f3")!!))
+        assertEquals(PieceType.KNIGHT, game.getPieceAt(Position.fromAlgebraic("g1")!!)?.type)
+        
+        // Undo another move
+        assertTrue(game.undoLastMove())
+        assertEquals(1, game.getMoveHistory().size)
+        assertEquals(PieceType.PAWN, game.getPieceAt(Position.fromAlgebraic("e7")!!)?.type)
+        
+        // Undo one more
+        assertTrue(game.undoLastMove())
+        assertEquals(0, game.getMoveHistory().size)
+        assertEquals("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", game.exportFEN())
+    }
+    
+    @Test
+    fun testUndoWhenNoMoves() {
+        // Try to undo when no moves have been made
+        assertFalse(game.undoLastMove())
+        assertEquals(0, game.getMoveHistory().size)
+    }
+    
+    @Test
+    fun testUndoCapture() {
+        // Set up and make a capture
+        game.importFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")
+        val d7 = Position.fromAlgebraic("d7")!!
+        val d5 = Position.fromAlgebraic("d5")!!
+        game.makeMove(d7, d5)
+        
+        val e4 = Position.fromAlgebraic("e4")!!
+        game.makeMove(e4, d5)
+        
+        // Verify capture
+        assertEquals(PieceColor.WHITE, game.getPieceAt(d5)?.color)
+        assertNull(game.getPieceAt(e4))
+        
+        // Undo the capture
+        assertTrue(game.undoLastMove())
+        
+        // Verify both pieces restored
+        assertEquals(PieceColor.WHITE, game.getPieceAt(e4)?.color)
+        assertEquals(PieceColor.BLACK, game.getPieceAt(d5)?.color)
+    }
+    
+    @Test
+    fun testUndoCastling() {
+        // Set up for kingside castling
+        game.importFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQK2R w KQkq - 0 1")
+        
+        val e1 = Position.fromAlgebraic("e1")!!
+        val g1 = Position.fromAlgebraic("g1")!!
+        game.makeMove(e1, g1)
+        
+        // Verify castling occurred
+        assertEquals(PieceType.KING, game.getPieceAt(g1)?.type)
+        assertEquals(PieceType.ROOK, game.getPieceAt(Position.fromAlgebraic("f1")!!)?.type)
+        
+        // Undo castling
+        assertTrue(game.undoLastMove())
+        
+        // Verify pieces restored
+        assertEquals(PieceType.KING, game.getPieceAt(e1)?.type)
+        assertEquals(PieceType.ROOK, game.getPieceAt(Position.fromAlgebraic("h1")!!)?.type)
+        assertNull(game.getPieceAt(g1))
+        assertNull(game.getPieceAt(Position.fromAlgebraic("f1")!!))
+    }
+    
+    @Test
+    fun testUndoEnPassant() {
+        // Set up en passant scenario
+        game.importFEN("rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 1")
+        
+        val e5 = Position.fromAlgebraic("e5")!!
+        val d6 = Position.fromAlgebraic("d6")!!
+        val d5 = Position.fromAlgebraic("d5")!!
+        
+        game.makeMove(e5, d6)
+        
+        // Verify en passant occurred
+        assertEquals(PieceType.PAWN, game.getPieceAt(d6)?.type)
+        assertNull(game.getPieceAt(d5))
+        
+        // Undo en passant
+        assertTrue(game.undoLastMove())
+        
+        // Verify pieces restored
+        assertEquals(PieceType.PAWN, game.getPieceAt(e5)?.type)
+        assertEquals(PieceColor.WHITE, game.getPieceAt(e5)?.color)
+        assertEquals(PieceType.PAWN, game.getPieceAt(d5)?.type)
+        assertEquals(PieceColor.BLACK, game.getPieceAt(d5)?.color)
+        assertNull(game.getPieceAt(d6))
+    }
+    
+    @Test
+    fun testUndoPromotion() {
+        // Set up pawn promotion
+        game.importFEN("8/P7/8/8/8/8/8/K6k w - - 0 1")
+        
+        val a7 = Position.fromAlgebraic("a7")!!
+        val a8 = Position.fromAlgebraic("a8")!!
+        
+        game.makeMove(a7, a8, PieceType.QUEEN)
+        
+        // Verify promotion
+        assertEquals(PieceType.QUEEN, game.getPieceAt(a8)?.type)
+        
+        // Undo promotion
+        assertTrue(game.undoLastMove())
+        
+        // Verify pawn restored
+        assertEquals(PieceType.PAWN, game.getPieceAt(a7)?.type)
+        assertNull(game.getPieceAt(a8))
+    }
+    
+    @Test
+    fun testUndoToMove() {
+        // Make several moves
+        game.makeMove(Position.fromAlgebraic("e2")!!, Position.fromAlgebraic("e4")!!)
+        game.makeMove(Position.fromAlgebraic("e7")!!, Position.fromAlgebraic("e5")!!)
+        game.makeMove(Position.fromAlgebraic("g1")!!, Position.fromAlgebraic("f3")!!)
+        game.makeMove(Position.fromAlgebraic("b8")!!, Position.fromAlgebraic("c6")!!)
+        
+        assertEquals(4, game.getMoveHistory().size)
+        
+        // Undo to move 2
+        assertTrue(game.undoToMove(2))
+        assertEquals(2, game.getMoveHistory().size)
+        
+        // Verify position after 2 moves
+        assertEquals(PieceType.PAWN, game.getPieceAt(Position.fromAlgebraic("e4")!!)?.type)
+        assertEquals(PieceType.PAWN, game.getPieceAt(Position.fromAlgebraic("e5")!!)?.type)
+        assertNull(game.getPieceAt(Position.fromAlgebraic("f3")!!))
+        assertNull(game.getPieceAt(Position.fromAlgebraic("c6")!!))
+    }
+    
+    @Test
+    fun testUndoToInitialPosition() {
+        // Make some moves
+        game.makeMove(Position.fromAlgebraic("e2")!!, Position.fromAlgebraic("e4")!!)
+        game.makeMove(Position.fromAlgebraic("e7")!!, Position.fromAlgebraic("e5")!!)
+        
+        // Undo to initial position
+        assertTrue(game.undoToMove(0))
+        assertEquals(0, game.getMoveHistory().size)
+        assertEquals("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", game.exportFEN())
+    }
+    
+    @Test
+    fun testUndoToInvalidMove() {
+        // Make 2 moves
+        game.makeMove(Position.fromAlgebraic("e2")!!, Position.fromAlgebraic("e4")!!)
+        game.makeMove(Position.fromAlgebraic("e7")!!, Position.fromAlgebraic("e5")!!)
+        
+        // Try to undo to future move
+        assertFalse(game.undoToMove(5))
+        assertEquals(2, game.getMoveHistory().size)
+        
+        // Try to undo to negative move
+        assertFalse(game.undoToMove(-1))
+        assertEquals(2, game.getMoveHistory().size)
+    }
+    
+    @Test
+    fun testGetUndoCount() {
+        assertEquals(0, game.getUndoCount())
+        
+        game.makeMove(Position.fromAlgebraic("e2")!!, Position.fromAlgebraic("e4")!!)
+        assertEquals(1, game.getUndoCount())
+        
+        game.makeMove(Position.fromAlgebraic("e7")!!, Position.fromAlgebraic("e5")!!)
+        assertEquals(2, game.getUndoCount())
+        
+        game.undoLastMove()
+        assertEquals(1, game.getUndoCount())
+        
+        game.undoLastMove()
+        assertEquals(0, game.getUndoCount())
+    }
 }

@@ -1,36 +1,60 @@
 package com.chenjili.chessgame.pages.chess.ui
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -48,38 +72,44 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
+import com.chenjili.chess.api.GameState
 import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
-import java.util.ArrayList
 
+@Composable
+private fun WalnutActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, colorResource(R.color.walnut_dark)),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = colorResource(R.color.walnut_medium),
+            contentColor = Color.White
+        ),
+        contentPadding = ButtonDefaults.ContentPadding
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
 
+// 升变提示框
 @Composable
 fun PromotionDialog(
     pieceColor: PieceColor,
     onPieceSelected: (PieceType) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
     val showDialog = remember { mutableStateOf(true) }
 
     val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
@@ -138,33 +168,39 @@ fun PromotionDialog(
                     )
 
                     val choices = listOf(
-                        PieceType.QUEEN to stringResource(R.string.queen),
-                        PieceType.ROOK to stringResource(R.string.rook),
-                        PieceType.BISHOP to stringResource(R.string.bishop),
-                        PieceType.KNIGHT to stringResource(R.string.knight),
+                        PieceType.QUEEN to R.string.queen,
+                        PieceType.ROOK to R.string.rook,
+                        PieceType.BISHOP to R.string.bishop,
+                        PieceType.KNIGHT to R.string.knight,
                     )
 
-                    // 2 * 2 网格布局，避免超出弹窗
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    val gridGap = 12.dp
+                    BoxWithConstraints(
                         modifier = Modifier.padding(vertical = 8.dp)
                     ) {
-                        choices.chunked(2).forEach { rowItems ->
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                rowItems.forEach { (pieceType, name) ->
-                                    PromotionPieceButton(
-                                        pieceType = pieceType,
-                                        pieceColor = pieceColor,
-                                        name = name,
-                                        onClick = {
-                                            showDialog.value = false
-                                            onPieceSelected(pieceType)
-                                        }
-                                    )
+                        val buttonWidth = ((maxWidth - gridGap) / 2f).coerceAtLeast(96.dp)
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(gridGap),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            choices.chunked(2).forEach { rowItems ->
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(gridGap),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    rowItems.forEach { (pieceType, nameSourceId) ->
+                                        PromotionPieceButton(
+                                            pieceType = pieceType,
+                                            pieceColor = pieceColor,
+                                            name = stringResource(nameSourceId),
+                                            width = buttonWidth,
+                                            onClick = {
+                                                showDialog.value = false
+                                                onPieceSelected(pieceType)
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -175,15 +211,18 @@ fun PromotionDialog(
     }
 }
 
+// 升变选项按钮
 @Composable
 fun PromotionPieceButton(
     pieceType: PieceType,
     pieceColor: PieceColor,
     name: String,
+    width: Dp,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
     val isPressed = remember { mutableStateOf(false) }
+    val density = LocalDensity.current
 
     val scale by animateFloatAsState(
         targetValue = if (isPressed.value) 0.9f else 1f,
@@ -193,6 +232,29 @@ fun PromotionPieceButton(
         ),
         label = "buttonScale"
     )
+
+    val wPx = with(density) { width.toPx() }.coerceAtLeast(1f)
+
+    fun lerpPxToDp(minPx: Float, maxPx: Float, t: Float): Dp {
+        val v = minPx + (maxPx - minPx) * t.coerceIn(0f, 1f)
+        return with(density) { v.toDp() }
+    }
+
+    val t = ((wPx - with(density) { 96.dp.toPx() }) /
+            (with(density) { 200.dp.toPx() } - with(density) { 96.dp.toPx() }))
+        .coerceIn(0f, 1f)
+
+    val cornerRadius = lerpPxToDp(minPx = 10f, maxPx = 16f, t = t)
+    val borderWidth = lerpPxToDp(minPx = 1.5f, maxPx = 2.5f, t = t)
+    val paddingH = lerpPxToDp(minPx = 8f, maxPx = 14f, t = t)
+    val paddingV = lerpPxToDp(minPx = 8f, maxPx = 14f, t = t)
+
+    val iconSize = with(density) {
+        (wPx * (0.55f + 0.07f * t)).toDp().coerceIn(44.dp, 84.dp)
+    }
+
+    val labelSp = with(density) { (10f + 4f * t) }
+    val topGap = lerpPxToDp(minPx = 4f, maxPx = 8f, t = t)
 
     val typeName = when (pieceType) {
         PieceType.QUEEN -> "queen"
@@ -208,7 +270,8 @@ fun PromotionPieceButton(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(120.dp) // 固定按钮宽度，2 列更稳
+            .width(width)
+            .aspectRatio(1f)
             .scale(scale)
             .clickable {
                 isPressed.value = true
@@ -216,31 +279,168 @@ fun PromotionPieceButton(
             }
             .background(
                 color = colorResource(R.color.walnut_light),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(cornerRadius)
             )
             .border(
-                BorderStroke(2.dp, colorResource(R.color.walnut_grain)),
-                shape = RoundedCornerShape(12.dp)
+                BorderStroke(borderWidth, colorResource(R.color.walnut_grain)),
+                shape = RoundedCornerShape(cornerRadius)
             )
-            .padding(horizontal = 10.dp, vertical = 10.dp) // 收紧内边距，避免弹窗溢出
+            .padding(horizontal = paddingH, vertical = paddingV)
     ) {
         if (resId != 0) {
             Image(
                 painter = painterResource(id = resId),
                 contentDescription = "${colorName} ${typeName}",
-                modifier = Modifier.size(48.dp) // 略缩小图标
+                modifier = Modifier.size(iconSize).padding(10.dp)
             )
         }
+
         Text(
             text = name,
-            fontSize = 12.sp,
+            fontSize = labelSp.sp,
             color = Color.White,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(top = 6.dp)
+            modifier = Modifier.padding(top = topGap)
         )
     }
 }
 
+// 对局结束提示框
+@Composable
+fun GameOverDialog(text: String, onDismiss: () -> Unit) {
+    val showDialog = remember { mutableStateOf(true) }
+
+    AnimatedVisibility(
+        visible = showDialog.value,
+        enter = fadeIn(animationSpec = tween(250)) + scaleIn(initialScale = 0.9f),
+        exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.9f)
+    ) {
+        Dialog(
+            onDismissRequest = {
+                showDialog.value = false
+                onDismiss()
+            },
+            properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
+        ) {
+            Box(
+                modifier = Modifier
+                    .shadow(14.dp, RoundedCornerShape(14.dp))
+                    .background(color = colorResource(R.color.walnut_medium), shape = RoundedCornerShape(14.dp))
+                    .border(BorderStroke(2.dp, colorResource(R.color.walnut_dark)), shape = RoundedCornerShape(14.dp))
+                    .padding(20.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = stringResource(R.string.game_over),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorResource(R.color.walnut_accent)
+                    )
+
+                    Text(
+                        text = text,
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Button(
+                            onClick = {
+                                showDialog.value = false
+                                onDismiss()
+                            }
+                        ) {
+                            Text(text = stringResource(R.string.ok))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 投降对话框
+@Composable
+fun SurrenderDialog(
+    onSurrenderConfirmed: (PieceColor) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val showDialog = remember { mutableStateOf(true) }
+
+    AnimatedVisibility(
+        visible = showDialog.value,
+        enter = fadeIn(animationSpec = tween(250)) + scaleIn(initialScale = 0.9f),
+        exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.9f)
+    ) {
+        Dialog(
+            onDismissRequest = {
+                showDialog.value = false
+                onDismiss()
+            },
+            properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
+        ) {
+            Box(
+                modifier = Modifier
+                    .shadow(14.dp, RoundedCornerShape(14.dp))
+                    .background(color = colorResource(R.color.walnut_medium), shape = RoundedCornerShape(14.dp))
+                    .border(BorderStroke(2.dp, colorResource(R.color.walnut_dark)), shape = RoundedCornerShape(14.dp))
+                    .padding(20.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = stringResource(R.string.surrender),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorResource(R.color.walnut_accent)
+                    )
+
+                    Text(
+                        text = stringResource(R.string.choose_surrendering_side),
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        WalnutActionButton(
+                            text = stringResource(R.string.white_surrenders),
+                            onClick = {
+                                showDialog.value = false
+                                onSurrenderConfirmed(PieceColor.WHITE)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        WalnutActionButton(
+                            text = stringResource(R.string.black_surrenders),
+                            onClick = {
+                                showDialog.value = false
+                                onSurrenderConfirmed(PieceColor.BLACK)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChessScreen(
     paddingDp: Dp = 8.dp,
@@ -260,45 +460,41 @@ fun ChessScreen(
                 val squareSize = minOf(maxW, maxH) - paddingDp * 2f
                 val density = LocalDensity.current
                 val context = LocalContext.current
-                val initialTopOffset = remember { (maxH - squareSize) / 2f }
 
-                // 背景图
                 Image(
                     painter = painterResource(id = R.drawable.bg_scholar_style),
                     contentDescription = null,
                     modifier = Modifier
-                        .matchParentSize()      // 占满 BoxWithConstraints 的可用区域，作为背景
+                        .matchParentSize()
                         .align(Alignment.Center),
-                    contentScale = ContentScale.Crop // 根据需要改为 Fit / FillBounds 等
+                    contentScale = ContentScale.Crop
                 )
 
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(paddingDp)
-                        .padding(top = initialTopOffset), // 固定顶部偏移，防止后续内容变化导致移动
+                        .padding(paddingDp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Top // 改为从顶部开始布局
-                )
-                {
-                    // 棋盘区
+                    verticalArrangement = Arrangement.Top
+                ) {
+                    // 棋盘贴上方
                     Box(
                         modifier = Modifier
+                            .padding(top = 8.dp)
                             .size(squareSize)
                             .onGloballyPositioned { coordinates ->
                                 val topLeft = coordinates.positionInWindow()
                                 val sizePx = coordinates.size
                                 with(density) {
-                                    val xDp = topLeft.x.toDp()
-                                    val yDp = topLeft.y.toDp()
-                                    val widthDp = sizePx.width.toDp()
-                                    val heightDp = sizePx.height.toDp()
-                                    onBoardLayoutChanged(xDp, yDp, widthDp, heightDp)
+                                    onBoardLayoutChanged(
+                                        topLeft.x.toDp(),
+                                        topLeft.y.toDp(),
+                                        sizePx.width.toDp(),
+                                        sizePx.height.toDp()
+                                    )
                                 }
                             }
-                    )
-                    {
-                        // 棋盘背景图
+                    ) {
                         Image(
                             painter = painterResource(id = R.drawable.chess_board_default),
                             contentDescription = "Chess board",
@@ -307,7 +503,7 @@ fun ChessScreen(
                                 .align(Alignment.TopStart)
                                 .rotate(if (state.playerColor == PieceColor.BLACK) 180f else 0f)
                         )
-                        // 计算格子与棋子尺寸
+
                         val cellDp = squareSize / 8f
                         val pieceDp = cellDp * 0.8f
                         val pieceOffsetInner = (cellDp - pieceDp) / 2f
@@ -317,7 +513,6 @@ fun ChessScreen(
                                 val targetX = (cellDp * pieceDisplay.column) + pieceOffsetInner
                                 val targetY = (cellDp * (7 - pieceDisplay.row)) + pieceOffsetInner
 
-                                // Animate the position with spring animation
                                 val animatedX by animateDpAsState(
                                     targetValue = targetX,
                                     animationSpec = spring(
@@ -326,7 +521,6 @@ fun ChessScreen(
                                     ),
                                     label = "pieceX_${pieceDisplay.id}"
                                 )
-
                                 val animatedY by animateDpAsState(
                                     targetValue = targetY,
                                     animationSpec = spring(
@@ -361,11 +555,9 @@ fun ChessScreen(
                             }
                         }
 
-                        // Render semi-transparent light green overlay on selected cell
                         state.selectedCell?.let { (selectedColumn, selectedRow) ->
                             val overlayX = cellDp * selectedColumn
                             val overlayY = cellDp * (7 - selectedRow)
-
                             Box(
                                 modifier = Modifier
                                     .size(cellDp)
@@ -375,7 +567,6 @@ fun ChessScreen(
                             )
                         }
 
-                        // 2) 透明点击层（放在最上面，覆盖整个棋盘）
                         val boardSizePx = with(LocalDensity.current) { squareSize.toPx() }
                         val cellSizePx = boardSizePx / 8f
 
@@ -386,147 +577,182 @@ fun ChessScreen(
                                     detectTapGestures { tap: Offset ->
                                         val x = tap.x.coerceIn(0f, boardSizePx - 0.001f)
                                         val y = tap.y.coerceIn(0f, boardSizePx - 0.001f)
-
                                         val colFromLeft = (x / cellSizePx).toInt().coerceIn(0, 7)
                                         val rowFromTop = (y / cellSizePx).toInt().coerceIn(0, 7)
-
-                                        // 你的绘制：y = cell * (7 - row)，所以 row = 7 - rowFromTop
                                         val column = colFromLeft
                                         val row = 7 - rowFromTop
-
-                                        onIntent(
-                                            ChessIntent.BoardCellClicked(
-                                                column,
-                                                row,
-                                                state.playerColor
-                                            )
-                                        )
+                                        onIntent(ChessIntent.BoardCellClicked(column, row, state.playerColor))
                                     }
                                 }
                         )
                     }
-                    // 功能区：如切换阵营
-                    Row(
+
+                    // 胡桃木风格的横向滚动工具条，预留空间
+                    Box(
                         modifier = Modifier
-                            .size(squareSize, 48.dp)
-                            .padding(top = 12.dp),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    )
-                    {
-                        Button(
-                            onClick = {
-                                val newColor =
-                                    if (state.playerColor == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
-                                onIntent(ChessIntent.PlayerColorChanged(newColor))
-                            }
+                            .padding(top = 12.dp)
+                            .widthIn(max = squareSize)
+                            .fillMaxWidth()
+                            .shadow(10.dp, RoundedCornerShape(14.dp))
+                            .background(colorResource(R.color.walnut_light), RoundedCornerShape(14.dp))
+                            .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Text(text = stringResource(id = R.string.switch_side))
+                            WalnutActionButton(
+                                text = stringResource(id = R.string.undo_move),
+                                onClick = { onIntent(ChessIntent.UndoMove) }
+                            )
+                            WalnutActionButton(
+                                text = stringResource(id = R.string.switch_side),
+                                onClick = {
+                                    val newColor =
+                                        if (state.playerColor == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
+                                    onIntent(ChessIntent.PlayerColorChanged(newColor))
+                                }
+                            )
+                            WalnutActionButton(
+                                text = stringResource(id = R.string.restart_game),
+                                onClick = { onIntent(ChessIntent.RestartGame(state.playerColor)) }
+                            )
+                            WalnutActionButton(
+                                text = stringResource(id = R.string.surrender),
+                                onClick = { onIntent(ChessIntent.SurrenderClicked) }
+                            )
                         }
                     }
 
-                    // 棋谱区
-                    if (state.moveHistory.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .size(squareSize, 200.dp)
-                                .padding(top = 8.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.game_record),
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-
-                            // 预处理：把 moveHistory 的 notation 按两步一组转换为 (moveNumber, white, black)
-                            val notationEmptyMove = stringResource(R.string.notation_empty_move)
-                            val movePairs = remember(state.moveHistory) {
-                                val moves = state.moveHistory
-                                val triples = ArrayList<Triple<Int, String, String>>()
-                                var moveNum = 1
-                                var whiteCache: String = ""
-                                for (move in moves) {
-                                    val notation = move.notation
-                                    val pieceColor = move.move.piece.color
-                                    when(pieceColor) {
-                                        PieceColor.WHITE -> {
-                                            if (whiteCache.isNotEmpty()) {
-                                                // 上一步白棋未配对，补全黑棋为 "--"
-                                                triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
-                                                ++moveNum
-                                            }
-                                            // 记录当前的白棋走子
-                                            whiteCache = notation
-                                        }
-                                        PieceColor.BLACK -> {
-                                            val whiteNotation = if (whiteCache.isNotEmpty()) whiteCache else notationEmptyMove
-                                            triples.add(Triple(moveNum, whiteNotation, notation))
-                                            whiteCache = ""
-                                            ++moveNum
-                                        }
+                    // 棋谱区变窄：比棋盘窄的居中卡片
+                    val notationEmptyMove = stringResource(R.string.notation_empty_move)
+                    val movePairs = remember(state.moveHistory) {
+                        val moves = state.moveHistory
+                        val triples = ArrayList<Triple<Int, String, String>>()
+                        var moveNum = 1
+                        var whiteCache = ""
+                        for (move in moves) {
+                            val notation = move.notation
+                            val pieceColor = move.move.piece.color
+                            when (pieceColor) {
+                                PieceColor.WHITE -> {
+                                    if (whiteCache.isNotEmpty()) {
+                                        triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
+                                        ++moveNum
                                     }
+                                    whiteCache = notation
                                 }
-                                if (whiteCache.isNotEmpty()) {
-                                    // 最后一步是白棋，补全黑棋为 "--"
-                                    triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
+                                PieceColor.BLACK -> {
+                                    val whiteNotation = if (whiteCache.isNotEmpty()) whiteCache else notationEmptyMove
+                                    triples.add(Triple(moveNum, whiteNotation, notation))
+                                    whiteCache = ""
+                                    ++moveNum
                                 }
-                                triples
                             }
+                        }
+                        if (whiteCache.isNotEmpty()) {
+                            triples.add(Triple(moveNum, whiteCache, notationEmptyMove))
+                        }
+                        triples
+                    }
 
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(180.dp)
-                                    .background(Color(0xFFF5F5F5))
-                                    .padding(8.dp),
-                                state = rememberLazyListState()
-                            ) {
-                                items(movePairs) { (num, whiteMove, blackMove) ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        // 序号列
-                                        Text(
-                                            text = "$num.",
-                                            modifier = Modifier
-                                                .weight(0.15f)
-                                                .padding(start = 4.dp),
-                                        )
+                    val lazyListState = rememberLazyListState()
+                    LaunchedEffect(movePairs.size) {
+                        if (movePairs.isNotEmpty()) {
+                            lazyListState.animateScrollToItem(movePairs.lastIndex)
+                        }
+                    }
 
-                                        // 白棋列（中间）
-                                        Text(
-                                            text = whiteMove,
-                                            modifier = Modifier
-                                                .weight(0.425f)
-                                                .padding(start = 8.dp),
-                                        )
+                    Column(
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .widthIn(max = squareSize * 0.78f)
+                            .fillMaxWidth()
+                            .shadow(10.dp, RoundedCornerShape(14.dp))
+                            .background(colorResource(R.color.walnut_medium), RoundedCornerShape(14.dp))
+                            .border(BorderStroke(1.dp, colorResource(R.color.walnut_dark)), RoundedCornerShape(14.dp))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.game_record),
+                            color = Color.White,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            fontWeight = FontWeight.SemiBold
+                        )
 
-                                        // 黑棋列（右）
-                                        Text(
-                                            text = blackMove,
-                                            modifier = Modifier
-                                                .weight(0.425f)
-                                                .padding(start = 8.dp),
-                                        )
-                                    }
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                                .background(colorResource(R.color.walnut_light), RoundedCornerShape(10.dp))
+                                .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(10.dp))
+                                .padding(8.dp),
+                            state = lazyListState
+                        ) {
+                            items(movePairs) { (num, whiteMove, blackMove) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "$num.",
+                                        modifier = Modifier.weight(0.16f),
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = whiteMove,
+                                        modifier = Modifier.weight(0.42f),
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = blackMove,
+                                        modifier = Modifier.weight(0.42f),
+                                        color = Color.White
+                                    )
                                 }
                             }
                         }
                     }
                 }
-                
-                // Show promotion dialog when there's a pending promotion
+
                 state.pendingPromotion?.let { pendingPromotion ->
                     PromotionDialog(
                         pieceColor = pendingPromotion.pieceColor,
                         onPieceSelected = { pieceType ->
                             onIntent(ChessIntent.PromotionPieceSelected(pieceType))
                         },
-                        onDismiss = {
-                            onIntent(ChessIntent.PromotionCancelled)
+                        onDismiss = { onIntent(ChessIntent.PromotionCancelled) }
+                    )
+                }
+
+                state.gameState?.let { gameState ->
+                    if (gameState.isGameOver()) {
+                        val gameOverTipId = when (gameState) {
+                            GameState.IN_PROGRESS -> R.string.game_state_desc_in_progress
+                            GameState.CHECKMATE_WHITE_WINS -> R.string.game_state_desc_checkmate_white_wins
+                            GameState.CHECKMATE_BLACK_WINS -> R.string.game_state_desc_checkmate_black_wins
+                            GameState.STALEMATE -> R.string.game_state_desc_stalemate
+                            GameState.DRAW_BY_INSUFFICIENT_MATERIAL -> R.string.game_state_desc_draw_by_insufficient_material
+                            GameState.DRAW_BY_FIFTY_MOVE_RULE -> R.string.game_state_desc_draw_by_fifty_move_rule
+                            GameState.DRAW_BY_THREEFOLD_REPETITION -> R.string.game_state_desc_draw_by_threefold_repetition
                         }
+                        GameOverDialog(
+                            text = stringResource(gameOverTipId),
+                            onDismiss = { onIntent(ChessIntent.GameOverDialogDismissed) }
+                        )
+                    }
+                }
+
+                if (state.showSurrenderDialog) {
+                    SurrenderDialog(
+                        onSurrenderConfirmed = { color ->
+                            onIntent(ChessIntent.SurrenderConfirmed(color))
+                        },
+                        onDismiss = { onIntent(ChessIntent.SurrenderCancelled) }
                     )
                 }
             }
