@@ -8,6 +8,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+keystore.properties
 *.class
 *.jar
+*.jks
 META-INF/
