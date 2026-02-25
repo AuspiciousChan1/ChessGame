@@ -15,12 +15,14 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.chenjili.chessgame"
-    compileSdk = 35
+    compileSdk {
+        version = release(36)
+    }
 
     defaultConfig {
         applicationId = "com.chenjili.chessgame"
-        minSdk = 26 // 建议：29有点高，26 (Android 8.0) 能覆盖更多设备，除非你必须用API 29+特性
-        targetSdk = 35 // 修改为稳定版 SDK
+        minSdk = 26
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
 
