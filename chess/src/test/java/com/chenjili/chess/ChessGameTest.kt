@@ -577,4 +577,66 @@ class ChessGameTest {
         assertEquals(0, game.getMoveHistory().size)
         assertEquals("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", game.exportFEN())
     }
+
+    @Test
+    fun testAnalyzeNextMoves_returnsRequestedNumberOfLegalRecommendations() {
+        val result = game.analyzeNextMoves(AnalysisRequest(maxRecommendations = 3, searchDepth = 1))
+
+        assertEquals(AnalysisSource.HEURISTIC, result.source)
+        assertEquals(game.exportFEN(), result.fen)
+        assertEquals(3, result.recommendations.size)
+        val legalMoves = game.getLegalMoves()
+        result.recommendations.forEach { recommendation ->
+            assertTrue(legalMoves.any {
+                it.from == recommendation.move.from &&
+                    it.to == recommendation.move.to &&
+                    it.promotionPiece == recommendation.move.promotionPiece
+            })
+            assertTrue(recommendation.pv.isNotEmpty())
+        }
+    }
+
+    @Test
+    fun testAnalyzeNextMoves_prefersCheckmatingMoveWhenAvailable() {
+        game.importFEN("6k1/6pp/8/7Q/8/3B4/8/6K1 w - - 0 1")
+
+        val result = game.analyzeNextMoves(AnalysisRequest(maxRecommendations = 1, searchDepth = 2))
+
+        val best = result.recommendations.first()
+        assertTrue(best.scoreCp > 90000)
+
+        val verificationGame = ChessGame()
+        assertTrue(verificationGame.importFEN(result.fen))
+        val applied = verificationGame.makeMove(best.move.from, best.move.to, best.move.promotionPiece)
+        assertNotNull(applied)
+        assertEquals(GameState.CHECKMATE_WHITE_WINS, verificationGame.getGameState())
+    }
+
+    @Test
+    fun testAnalyzeNextMoves_usesExternalAnalyzerWhenProvided() {
+        val expectedMove = game.getLegalMoves().first()
+        game.setPositionAnalyzer(object : IPositionAnalyzer {
+            override fun analyze(fen: String, legalMoves: List<Move>, request: AnalysisRequest): AnalysisResult {
+                return AnalysisResult(
+                    source = AnalysisSource.STOCKFISH_UCI,
+                    fen = fen,
+                    recommendations = listOf(
+                        RecommendedMove(
+                            move = expectedMove,
+                            uci = expectedMove.from.toAlgebraic() + expectedMove.to.toAlgebraic(),
+                            scoreCp = 42,
+                            pv = listOf("external")
+                        )
+                    )
+                )
+            }
+        })
+
+        val result = game.analyzeNextMoves(AnalysisRequest(maxRecommendations = 1, searchDepth = 1))
+
+        assertEquals(AnalysisSource.STOCKFISH_UCI, result.source)
+        assertEquals(1, result.recommendations.size)
+        assertEquals(42, result.recommendations.first().scoreCp)
+        assertEquals(listOf("external"), result.recommendations.first().pv)
+    }
 }

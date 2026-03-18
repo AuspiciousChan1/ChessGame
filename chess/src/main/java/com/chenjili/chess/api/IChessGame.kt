@@ -138,7 +138,18 @@ interface IChessGame {
      *
      */
     fun getResignedColor(): PieceColor?
-    
+
+    /**
+     * Analyze the current position and return recommended next moves.
+     */
+    fun analyzeNextMoves(request: AnalysisRequest = AnalysisRequest()): AnalysisResult
+
+    /**
+     * Register an optional external analyzer bridge, e.g. a Stockfish UCI adapter.
+     * Passing null restores the built-in heuristic analyzer.
+     */
+    fun setPositionAnalyzer(analyzer: IPositionAnalyzer?)
+
     /**
      * Reset the game to initial position
      */

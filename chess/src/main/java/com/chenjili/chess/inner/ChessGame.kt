@@ -64,7 +64,25 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
 
     // 投降方（null 表示无人投降）
     private var resignedColor: PieceColor? = null
-    
+    private var positionAnalyzer: IPositionAnalyzer? = null
+
+    private data class SearchNode(
+        val scoreCp: Int,
+        val pv: List<String>
+    )
+
+    companion object {
+        private const val CHECKMATE_SCORE_CP = 100_000
+        private val PIECE_VALUES = mapOf(
+            PieceType.PAWN to 100,
+            PieceType.KNIGHT to 320,
+            PieceType.BISHOP to 330,
+            PieceType.ROOK to 500,
+            PieceType.QUEEN to 900,
+            PieceType.KING to 20_000,
+        )
+    }
+
     init {
         reset()
     }
@@ -324,7 +342,7 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
         
         return sb.toString()
     }
-    
+
     override fun importPGN(pgn: String): Boolean {
         try {
             reset()
@@ -910,7 +928,124 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     override fun getActiveColor(): PieceColor = activeColor
     
     override fun getMoveHistory(): List<Move> = moveHistory.toList()
-    
+
+    override fun setPositionAnalyzer(analyzer: IPositionAnalyzer?) {
+        positionAnalyzer = analyzer
+    }
+
+    override fun analyzeNextMoves(request: AnalysisRequest): AnalysisResult {
+        val normalizedRequest = request.copy(
+            maxRecommendations = request.maxRecommendations.coerceAtLeast(1),
+            searchDepth = request.searchDepth.coerceAtLeast(1),
+        )
+        val fen = exportFEN()
+        val legalMoves = getLegalMoves()
+        positionAnalyzer?.analyze(fen, legalMoves, normalizedRequest)?.let { return it }
+
+        if (legalMoves.isEmpty()) {
+            return AnalysisResult(
+                source = AnalysisSource.HEURISTIC,
+                fen = fen,
+                recommendations = emptyList(),
+            )
+        }
+
+        val rankedMoves = legalMoves.mapNotNull { move ->
+            val nextGame = createAnalysisClone() ?: return@mapNotNull null
+            val appliedMove = nextGame.makeMove(move.from, move.to, move.promotionPiece) ?: return@mapNotNull null
+            val child = nextGame.negamax(normalizedRequest.searchDepth - 1)
+            val uci = appliedMove.toUci()
+            RecommendedMove(
+                move = move,
+                uci = uci,
+                scoreCp = -child.scoreCp,
+                pv = listOf(uci) + child.pv,
+            )
+        }.sortedWith(
+            compareByDescending<RecommendedMove> { it.scoreCp }
+                .thenBy { it.uci }
+        ).take(normalizedRequest.maxRecommendations)
+
+        return AnalysisResult(
+            source = AnalysisSource.HEURISTIC,
+            fen = fen,
+            recommendations = rankedMoves,
+        )
+    }
+
+    private fun createAnalysisClone(): ChessGame? {
+        val clone = ChessGame()
+        if (!clone.importFEN(exportFEN())) {
+            return null
+        }
+        clone.resignedColor = resignedColor
+        clone.setPositionAnalyzer(null)
+        return clone
+    }
+
+    private fun negamax(depth: Int): SearchNode {
+        val currentState = getGameState()
+        if (depth <= 0 || currentState.isGameOver()) {
+            return SearchNode(scoreCp = evaluateCurrentPosition(), pv = emptyList())
+        }
+
+        val legalMoves = getLegalMoves()
+        if (legalMoves.isEmpty()) {
+            return SearchNode(scoreCp = evaluateCurrentPosition(), pv = emptyList())
+        }
+
+        var bestScore = Int.MIN_VALUE
+        var bestPv = emptyList<String>()
+
+        for (move in legalMoves) {
+            val nextGame = createAnalysisClone() ?: continue
+            val appliedMove = nextGame.makeMove(move.from, move.to, move.promotionPiece) ?: continue
+            val child = nextGame.negamax(depth - 1)
+            val score = -child.scoreCp
+            if (score > bestScore) {
+                bestScore = score
+                bestPv = listOf(appliedMove.toUci()) + child.pv
+            }
+        }
+
+        return if (bestScore == Int.MIN_VALUE) {
+            SearchNode(scoreCp = evaluateCurrentPosition(), pv = emptyList())
+        } else {
+            SearchNode(scoreCp = bestScore, pv = bestPv)
+        }
+    }
+
+    private fun evaluateCurrentPosition(): Int {
+        return when (val currentState = getGameState()) {
+            GameState.CHECKMATE_WHITE_WINS -> if (activeColor == PieceColor.WHITE) CHECKMATE_SCORE_CP else -CHECKMATE_SCORE_CP
+            GameState.CHECKMATE_BLACK_WINS -> if (activeColor == PieceColor.BLACK) CHECKMATE_SCORE_CP else -CHECKMATE_SCORE_CP
+            GameState.STALEMATE,
+            GameState.DRAW_BY_INSUFFICIENT_MATERIAL,
+            GameState.DRAW_BY_FIFTY_MOVE_RULE,
+            GameState.DRAW_BY_THREEFOLD_REPETITION -> 0
+            GameState.IN_PROGRESS -> {
+                var score = 0
+                for ((_, piece) in getAllPieces()) {
+                    val value = PIECE_VALUES[piece.type] ?: 0
+                    score += if (piece.color == activeColor) value else -value
+                }
+                val mobility = getLegalMoves().size
+                score + mobility * 4
+            }
+        }
+    }
+
+    private fun Move.toUci(): String {
+        val promotionSuffix = when (promotionPiece) {
+            PieceType.QUEEN -> "q"
+            PieceType.ROOK -> "r"
+            PieceType.BISHOP -> "b"
+            PieceType.KNIGHT -> "n"
+            else -> ""
+        }
+        return from.toAlgebraic() + to.toAlgebraic() + promotionSuffix
+    }
+
     /**
      * Parse algebraic chess notation to a Move object
      * Note: This is a simplified parser that handles common PGN formats.
