@@ -52,4 +52,24 @@
     <string name="import_pgn_error_empty">Please enter a PGN string</string>
     <string name="import_fen_error_invalid">Invalid FEN format</string>
     <string name="import_pgn_error_invalid">Invalid PGN format</string>
+    <string name="copy_fen">Copy FEN</string>
+    <string name="fen_copied_to_clipboard">FEN copied to clipboard</string>
+    <string name="white_side">White</string>
+    <string name="black_side">Black</string>
+    <string name="fen_export_dialog_title">Export FEN</string>
+    <string name="fen_export_active_color">Side to move</string>
+    <string name="fen_export_castling_rights">Castling rights</string>
+    <string name="fen_export_castling_white_kingside">White kingside (K)</string>
+    <string name="fen_export_castling_white_queenside">White queenside (Q)</string>
+    <string name="fen_export_castling_black_kingside">Black kingside (k)</string>
+    <string name="fen_export_castling_black_queenside">Black queenside (q)</string>
+    <string name="fen_export_en_passant">En passant target</string>
+    <string name="fen_export_en_passant_hint">Use - or a square like e3 / d6</string>
+    <string name="fen_export_halfmove">Halfmove clock</string>
+    <string name="fen_export_fullmove">Fullmove number</string>
+    <string name="fen_export_preview">FEN preview</string>
+    <string name="fen_export_preview_invalid_placeholder">Preview unavailable until all fields are valid.</string>
+    <string name="fen_export_error_invalid_en_passant">En passant must be - or a valid square on rank 3/6.</string>
+    <string name="fen_export_error_invalid_halfmove">Halfmove clock must be a number greater than or equal to 0.</string>
+    <string name="fen_export_error_invalid_fullmove">Fullmove number must be a number greater than or equal to 1.</string>
 </resources>

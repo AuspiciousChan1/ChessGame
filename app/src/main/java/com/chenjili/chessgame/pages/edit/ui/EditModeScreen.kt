@@ -1,5 +1,6 @@
 package com.chenjili.chessgame.pages.edit.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,10 +15,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -27,11 +35,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.chenjili.chess.api.Piece
@@ -39,7 +49,149 @@ import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.edit.ui.theme.ChessGameTheme
-import kotlinx.coroutines.selects.select
+
+@Composable
+private fun FenExportDialog(
+    draft: FenExportDraft,
+    onIntent: (EditModeIntent) -> Unit,
+) {
+    val validationTextRes = when (draft.validationError) {
+        FenExportValidationError.INVALID_EN_PASSANT -> R.string.fen_export_error_invalid_en_passant
+        FenExportValidationError.INVALID_HALF_MOVE_CLOCK -> R.string.fen_export_error_invalid_halfmove
+        FenExportValidationError.INVALID_FULL_MOVE_NUMBER -> R.string.fen_export_error_invalid_fullmove
+        null -> null
+    }
+
+    AlertDialog(
+        onDismissRequest = { onIntent(EditModeIntent.DismissFenExportDialog) },
+        title = {
+            Text(text = stringResource(R.string.fen_export_dialog_title))
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(text = stringResource(R.string.fen_export_active_color))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            onIntent(EditModeIntent.FenExportActiveColorChanged(PieceColor.WHITE))
+                        }
+                    ) {
+                        RadioButton(
+                            selected = draft.activeColor == PieceColor.WHITE,
+                            onClick = { onIntent(EditModeIntent.FenExportActiveColorChanged(PieceColor.WHITE)) }
+                        )
+                        Text(text = stringResource(R.string.white_side))
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            onIntent(EditModeIntent.FenExportActiveColorChanged(PieceColor.BLACK))
+                        }
+                    ) {
+                        RadioButton(
+                            selected = draft.activeColor == PieceColor.BLACK,
+                            onClick = { onIntent(EditModeIntent.FenExportActiveColorChanged(PieceColor.BLACK)) }
+                        )
+                        Text(text = stringResource(R.string.black_side))
+                    }
+                }
+
+                Text(text = stringResource(R.string.fen_export_castling_rights))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = draft.whiteKingsideCastling,
+                            onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.WHITE_KINGSIDE, it)) }
+                        )
+                        Text(text = stringResource(R.string.fen_export_castling_white_kingside))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = draft.whiteQueensideCastling,
+                            onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.WHITE_QUEENSIDE, it)) }
+                        )
+                        Text(text = stringResource(R.string.fen_export_castling_white_queenside))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = draft.blackKingsideCastling,
+                            onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.BLACK_KINGSIDE, it)) }
+                        )
+                        Text(text = stringResource(R.string.fen_export_castling_black_kingside))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = draft.blackQueensideCastling,
+                            onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.BLACK_QUEENSIDE, it)) }
+                        )
+                        Text(text = stringResource(R.string.fen_export_castling_black_queenside))
+                    }
+                }
+
+                OutlinedTextField(
+                    value = draft.enPassantTargetInput,
+                    onValueChange = { onIntent(EditModeIntent.FenExportEnPassantChanged(it)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.fen_export_en_passant)) },
+                    placeholder = { Text(stringResource(R.string.fen_export_en_passant_hint)) },
+                    isError = draft.validationError == FenExportValidationError.INVALID_EN_PASSANT,
+                )
+                OutlinedTextField(
+                    value = draft.halfMoveClockInput,
+                    onValueChange = { onIntent(EditModeIntent.FenExportHalfMoveChanged(it)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.fen_export_halfmove)) },
+                    isError = draft.validationError == FenExportValidationError.INVALID_HALF_MOVE_CLOCK,
+                )
+                OutlinedTextField(
+                    value = draft.fullMoveNumberInput,
+                    onValueChange = { onIntent(EditModeIntent.FenExportFullMoveChanged(it)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.fen_export_fullmove)) },
+                    isError = draft.validationError == FenExportValidationError.INVALID_FULL_MOVE_NUMBER,
+                )
+
+                validationTextRes?.let { textRes ->
+                    Text(
+                        text = stringResource(textRes),
+                        color = Color(0xFFB00020)
+                    )
+                }
+
+                Text(text = stringResource(R.string.fen_export_preview))
+                SelectionContainer {
+                    Text(
+                        text = draft.previewFen.ifBlank { stringResource(R.string.fen_export_preview_invalid_placeholder) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White.copy(alpha = 0.12f))
+                            .padding(10.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onIntent(EditModeIntent.ConfirmFenExport) },
+                enabled = draft.canConfirm,
+            ) {
+                Text(text = stringResource(R.string.copy_fen))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onIntent(EditModeIntent.DismissFenExportDialog) }) {
+                Text(text = stringResource(R.string.cancel))
+            }
+        }
+    )
+}
 
 @Composable
 fun EditModeScreen(
@@ -48,6 +200,21 @@ fun EditModeScreen(
     paddingDp: Dp = 8.dp,
 )
 {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+
+    LaunchedEffect(state.pendingFenToCopy) {
+        state.pendingFenToCopy?.let { fen ->
+            clipboardManager.setText(AnnotatedString(fen))
+            Toast.makeText(
+                context,
+                context.getString(R.string.fen_copied_to_clipboard),
+                Toast.LENGTH_SHORT
+            ).show()
+            onIntent(EditModeIntent.ExportFenHandled)
+        }
+    }
+
     ChessGameTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             BoxWithConstraints(modifier = Modifier.fillMaxSize()
@@ -56,28 +223,26 @@ fun EditModeScreen(
                 val maxH = this.maxHeight
                 val squareSize = minOf(maxW, maxH) - paddingDp * 2f
                 val density = LocalDensity.current
-                val context = LocalContext.current
                 val initialTopOffset = remember { paddingDp }
                 val pieceSize = squareSize / 10f
                 val pieceSpacing = 8.dp
 
-                // 背景图
                 Image(
                     painter = painterResource(id = R.drawable.bg_scholar_style),
                     contentDescription = null,
                     modifier = Modifier
-                        .matchParentSize()      // 占满 BoxWithConstraints 的可用区域，作为背景
+                        .matchParentSize()
                         .align(Alignment.Center),
-                    contentScale = ContentScale.Crop // 根据需要改为 Fit / FillBounds 等
+                    contentScale = ContentScale.Crop
                 )
 
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingDp)
-                        .padding(top = initialTopOffset), // 固定顶部偏移，防止后续内容变化导致移动
+                        .padding(top = initialTopOffset),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Top // 改为从顶部开始布局
+                    verticalArrangement = Arrangement.Top
                 ) {
                     Box(modifier = Modifier
                         .align(Alignment.CenterHorizontally)
@@ -99,13 +264,11 @@ fun EditModeScreen(
                             onIntent = onIntent
                         )
                     }
-                    // 棋盘区
                     Box(
                         modifier = Modifier
                             .size(squareSize)
                     )
                     {
-                        // 棋盘背景图
                         Image(
                             painter = painterResource(id = R.drawable.chess_board_default),
                             contentDescription = "Chess board",
@@ -114,7 +277,6 @@ fun EditModeScreen(
                                 .align(Alignment.TopStart)
                                 .rotate(if (state.playerColor == PieceColor.BLACK) 180f else 0f)
                         )
-                        // 计算格子与棋子尺寸
                         val cellDp = squareSize / 8f
                         val pieceDp = cellDp * 0.8f
                         val pieceOffsetInner = (cellDp - pieceDp) / 2f
@@ -123,37 +285,21 @@ fun EditModeScreen(
                             key(pieceDisplay.id) {
                                 val targetX = (cellDp * pieceDisplay.column) + pieceOffsetInner
                                 val targetY = (cellDp * (7 - pieceDisplay.row)) + pieceOffsetInner
-
-                                // 直接使用目标位置（不再动画）
                                 val posX = targetX
                                 val posY = targetY
 
-                                val typeName = when (pieceDisplay.piece.type) {
-                                    PieceType.KING -> "king"
-                                    PieceType.QUEEN -> "queen"
-                                    PieceType.ROOK -> "rook"
-                                    PieceType.BISHOP -> "bishop"
-                                    PieceType.KNIGHT -> "knight"
-                                    PieceType.PAWN -> "pawn"
-                                }
-                                val colorName = if (pieceDisplay.piece.color == PieceColor.WHITE) "white" else "black"
-                                val resName = "chess_piece_${colorName}_$typeName"
-                                val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
-
-                                if (resId != 0) {
-                                    Image(
-                                        painter = painterResource(id = resId),
-                                        contentDescription = "${colorName}_$typeName",
-                                        modifier = Modifier
-                                            .size(pieceDp)
-                                            .align(Alignment.TopStart)
-                                            .offset(x = posX, y = posY)
-                                    )
-                                }
+                                val resId = pieceDisplay.piece.getDrawableId()
+                                Image(
+                                    painter = painterResource(id = resId),
+                                    contentDescription = pieceDisplay.piece.contentDescription(),
+                                    modifier = Modifier
+                                        .size(pieceDp)
+                                        .align(Alignment.TopStart)
+                                        .offset(x = posX, y = posY)
+                                )
                             }
                         }
 
-                        // Render semi-transparent light green overlay on selected cell
                         state.selectedCell?.let { (selectedColumn, selectedRow) ->
                             val overlayX = cellDp * selectedColumn
                             val overlayY = cellDp * (7 - selectedRow)
@@ -167,7 +313,6 @@ fun EditModeScreen(
                             )
                         }
 
-                        // 2) 透明点击层（放在最上面，覆盖整个棋盘）
                         val boardSizePx = with(density) { squareSize.toPx() }
                         val cellSizePx = boardSizePx / 8f
 
@@ -178,11 +323,8 @@ fun EditModeScreen(
                                     detectTapGestures { tap: Offset ->
                                         val x = tap.x.coerceIn(0f, boardSizePx - 0.001f)
                                         val y = tap.y.coerceIn(0f, boardSizePx - 0.001f)
-
                                         val colFromLeft = (x / cellSizePx).toInt().coerceIn(0, 7)
                                         val rowFromTop = (y / cellSizePx).toInt().coerceIn(0, 7)
-
-                                        // 你的绘制：y = cell * (7 - row)，所以 row = 7 - rowFromTop
                                         val column = colFromLeft
                                         val row = 7 - rowFromTop
 
@@ -197,7 +339,6 @@ fun EditModeScreen(
                                 }
                         )
                     }
-                    // 编辑区：棋子预览行
                     Box(modifier = Modifier
                         .align(Alignment.CenterHorizontally)
                         .fillMaxWidth()
@@ -218,7 +359,6 @@ fun EditModeScreen(
                             onIntent = onIntent
                         )
                     }
-                    // 功能区：如切换阵营
                     Row(
                         modifier = Modifier
                             .size(squareSize, 48.dp)
@@ -243,7 +383,21 @@ fun EditModeScreen(
                         ) {
                             Text(text = stringResource(id = R.string.clear_board))
                         }
+                        Button(
+                            onClick = {
+                                onIntent(EditModeIntent.ExportFenClicked)
+                            }
+                        ) {
+                            Text(text = stringResource(id = R.string.copy_fen))
+                        }
                     }
+                }
+
+                state.fenExportDraft?.let { draft ->
+                    FenExportDialog(
+                        draft = draft,
+                        onIntent = onIntent,
+                    )
                 }
             }
         }
@@ -267,7 +421,7 @@ fun PiecesForEdit(pieceColor: PieceColor, pieceSize: Dp, pieceSpacing: Dp, selec
             Piece(PieceType.KING, pieceColor),
             null
         )
-        topPieces.forEachIndexed { index, piece ->
+        topPieces.forEach { piece ->
             val resId = piece?.getDrawableId() ?: R.drawable.remove_piece
             if (resId != 0) {
                 Image(

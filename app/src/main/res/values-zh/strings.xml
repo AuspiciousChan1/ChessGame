@@ -53,4 +53,24 @@
     <string name="import_pgn_error_empty">请输入 PGN 字符串</string>
     <string name="import_fen_error_invalid">FEN 格式不正确</string>
     <string name="import_pgn_error_invalid">PGN 格式不正确</string>
+    <string name="copy_fen">复制 FEN</string>
+    <string name="fen_copied_to_clipboard">FEN 已复制到剪贴板</string>
+    <string name="white_side">白方</string>
+    <string name="black_side">黑方</string>
+    <string name="fen_export_dialog_title">导出 FEN</string>
+    <string name="fen_export_active_color">下一手行棋方</string>
+    <string name="fen_export_castling_rights">王车易位权限</string>
+    <string name="fen_export_castling_white_kingside">白方王侧易位 (K)</string>
+    <string name="fen_export_castling_white_queenside">白方后侧易位 (Q)</string>
+    <string name="fen_export_castling_black_kingside">黑方王侧易位 (k)</string>
+    <string name="fen_export_castling_black_queenside">黑方后侧易位 (q)</string>
+    <string name="fen_export_en_passant">吃过路兵目标格</string>
+    <string name="fen_export_en_passant_hint">填 - 或类似 e3 / d6 的格子</string>
+    <string name="fen_export_halfmove">半回合计数</string>
+    <string name="fen_export_fullmove">全回合数</string>
+    <string name="fen_export_preview">FEN 预览</string>
+    <string name="fen_export_preview_invalid_placeholder">当前输入无效，暂无法生成预览。</string>
+    <string name="fen_export_error_invalid_en_passant">吃过路兵目标格必须为 - 或者第 3 / 6 行的合法格子。</string>
+    <string name="fen_export_error_invalid_halfmove">半回合计数必须是大于等于 0 的整数。</string>
+    <string name="fen_export_error_invalid_fullmove">全回合数必须是大于等于 1 的整数。</string>
 </resources>

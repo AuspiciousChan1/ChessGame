@@ -2,13 +2,96 @@ package com.chenjili.chessgame.pages.edit.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chenjili.chess.api.ChessServiceFactory
 import com.chenjili.chess.api.Piece
 import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
+import com.chenjili.chess.api.Position
 import com.chenjili.chessgame.pages.chess.ui.ChessPieceDisplay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+data class FenExportOptions(
+    val activeColor: PieceColor,
+    val castlingRights: String,
+    val enPassantTarget: Position?,
+    val halfMoveClock: Int,
+    val fullMoveNumber: Int,
+)
+
+enum class FenExportValidationError {
+    INVALID_EN_PASSANT,
+    INVALID_HALF_MOVE_CLOCK,
+    INVALID_FULL_MOVE_NUMBER,
+}
+
+data class FenExportDraft(
+    val activeColor: PieceColor = PieceColor.WHITE,
+    val whiteKingsideCastling: Boolean = false,
+    val whiteQueensideCastling: Boolean = false,
+    val blackKingsideCastling: Boolean = false,
+    val blackQueensideCastling: Boolean = false,
+    val enPassantTargetInput: String = "-",
+    val halfMoveClockInput: String = "0",
+    val fullMoveNumberInput: String = "1",
+    val previewFen: String = "",
+    val validationError: FenExportValidationError? = null,
+    val canConfirm: Boolean = true,
+)
+
+enum class FenCastlingSlot {
+    WHITE_KINGSIDE,
+    WHITE_QUEENSIDE,
+    BLACK_KINGSIDE,
+    BLACK_QUEENSIDE,
+}
+
+internal object EditModeFenExporter {
+    fun exportFen(pieces: List<ChessPieceDisplay>, playerColor: PieceColor): String {
+        return exportFen(
+            pieces = pieces,
+            boardPerspective = playerColor,
+            options = FenExportOptions(
+                activeColor = playerColor,
+                castlingRights = "-",
+                enPassantTarget = null,
+                halfMoveClock = 0,
+                fullMoveNumber = 1,
+            )
+        )
+    }
+
+    fun exportFen(
+        pieces: List<ChessPieceDisplay>,
+        boardPerspective: PieceColor,
+        options: FenExportOptions,
+    ): String {
+        val normalizedPieces = pieces.associate { pieceDisplay ->
+            val position = if (boardPerspective == PieceColor.WHITE) {
+                Position(pieceDisplay.column, pieceDisplay.row)
+            } else {
+                Position(7 - pieceDisplay.column, 7 - pieceDisplay.row)
+            }
+            position to pieceDisplay.piece
+        }
+
+        val game = ChessServiceFactory.chessService.createGame()
+        return try {
+            game.setupPosition(
+                pieces = normalizedPieces,
+                activeColor = options.activeColor,
+                castlingRights = options.castlingRights,
+                enPassantTarget = options.enPassantTarget,
+                halfMoveClock = options.halfMoveClock,
+                fullMoveNumber = options.fullMoveNumber,
+            )
+            game.exportFEN()
+        } finally {
+            ChessServiceFactory.chessService.deleteGame(game.id)
+        }
+    }
+}
 
 enum class EditType {
     NONE,
@@ -23,6 +106,8 @@ data class EditModeState(
     val selectedCell: Pair<Int, Int>? = null,
     val selectedPiece: Piece? = null,
     val editType: EditType = EditType.NONE,
+    val pendingFenToCopy: String? = null,
+    val fenExportDraft: FenExportDraft? = null,
 )
 
 sealed interface EditModeIntent {
@@ -30,6 +115,15 @@ sealed interface EditModeIntent {
     data class BoardCellClicked(val column: Int, val row: Int, val playerColor: PieceColor): EditModeIntent
     data class PieceForEditClicked(val removeMode: Boolean, val piece: Piece?,): EditModeIntent
     object ClearBoard: EditModeIntent
+    object ExportFenClicked : EditModeIntent
+    object ExportFenHandled : EditModeIntent
+    object DismissFenExportDialog : EditModeIntent
+    object ConfirmFenExport : EditModeIntent
+    data class FenExportActiveColorChanged(val color: PieceColor) : EditModeIntent
+    data class FenExportCastlingChanged(val slot: FenCastlingSlot, val enabled: Boolean) : EditModeIntent
+    data class FenExportEnPassantChanged(val value: String) : EditModeIntent
+    data class FenExportHalfMoveChanged(val value: String) : EditModeIntent
+    data class FenExportFullMoveChanged(val value: String) : EditModeIntent
 }
 
 class EditModeViewModel : ViewModel() {
@@ -69,7 +163,6 @@ class EditModeViewModel : ViewModel() {
                 ChessPieceDisplay(Piece(PieceType.ROOK, PieceColor.BLACK), 7, 7, pieceId++)
             )
 
-            // 初始化棋盘为空
             _state.value = EditModeState(
                 playerColor = PieceColor.WHITE,
                 pieces = pieces,
@@ -82,19 +175,24 @@ class EditModeViewModel : ViewModel() {
 
     fun processIntent(intent: EditModeIntent) {
         when (intent) {
-            is EditModeIntent.PlayerColorChanged -> {
-                // 处理玩家颜色更改
-                handlePlayerColorChanged(intent.newColor)
+            is EditModeIntent.PlayerColorChanged -> handlePlayerColorChanged(intent.newColor)
+            is EditModeIntent.BoardCellClicked -> handleBoardCellClicked(intent.column, intent.row)
+            is EditModeIntent.PieceForEditClicked -> handlePieceForEditClicked(intent.removeMode, intent.piece)
+            is EditModeIntent.ClearBoard -> handleClearBoardClicked()
+            is EditModeIntent.ExportFenClicked -> handleExportFenClicked()
+            is EditModeIntent.ExportFenHandled -> handleExportFenHandled()
+            is EditModeIntent.DismissFenExportDialog -> handleDismissFenExportDialog()
+            is EditModeIntent.ConfirmFenExport -> handleConfirmFenExport()
+            is EditModeIntent.FenExportActiveColorChanged -> handleFenExportDraftChanged { copy(activeColor = intent.color) }
+            is EditModeIntent.FenExportCastlingChanged -> handleFenExportCastlingChanged(intent.slot, intent.enabled)
+            is EditModeIntent.FenExportEnPassantChanged -> handleFenExportDraftChanged {
+                copy(enPassantTargetInput = intent.value)
             }
-            is EditModeIntent.BoardCellClicked -> {
-                // 处理棋盘格子点击事件
-                handleBoardCellClicked(intent.column, intent.row)
+            is EditModeIntent.FenExportHalfMoveChanged -> handleFenExportDraftChanged {
+                copy(halfMoveClockInput = intent.value)
             }
-            is EditModeIntent.PieceForEditClicked -> {
-                handlePieceForEditClicked(intent.removeMode, intent.piece)
-            }
-            is EditModeIntent.ClearBoard -> {
-                handleClearBoardClicked()
+            is EditModeIntent.FenExportFullMoveChanged -> handleFenExportDraftChanged {
+                copy(fullMoveNumberInput = intent.value)
             }
         }
     }
@@ -111,63 +209,43 @@ class EditModeViewModel : ViewModel() {
         _state.value = currentState.copy(
             playerColor = newColor,
             pieces = updatedPieces,
-            selectedCell = null, // Clear selection when switching sides
+            selectedCell = null,
             selectedPiece = null,
             editType = EditType.NONE,
+            pendingFenToCopy = null,
+            fenExportDraft = null,
         )
     }
 
-    /**
-     * 处理棋盘格子点击事件
-     * @param column 被点击的列 (0-7)，不受棋盘被翻转的影响
-     * @param row 被点击的行 (0-7)，不受棋盘被翻转的影响
-     * @param playerColor 当前玩家颜色
-     */
     private fun handleBoardCellClicked(column: Int, row: Int) {
-        // Check if click is within valid board range
         if (column !in 0..7 || row !in 0..7) {
-            // Click outside board - clear selection
             return
         }
 
         val currentState = _state.value
         val clickedCell = Pair(column, row)
-
-        // Find piece at clicked position
         val pieceAtClickedCell = currentState.pieces.find {
             it.column == column && it.row == row
         }
 
         when {
-            // Case 1: 点击已经被选中的格子 -> 取消选中
             currentState.selectedCell == clickedCell -> {
                 select(false, null, null, null)
             }
-
-            // Case 2: 当前没有棋子被选中，而且不是remove模式 -> 选中这个格子，如果格子上有棋子，也选中这个棋子
             currentState.selectedPiece == null && currentState.editType != EditType.REMOVE -> {
                 select(false, pieceAtClickedCell?.piece, clickedCell.first, clickedCell.second)
             }
-
-            // Case 3: 当前没有格子被选中，但有棋子（编辑区的棋子）被选中或者处于remove模式 -> 在此格子放置选中的棋子或者删除格子上的棋子
             currentState.selectedCell == null && (currentState.selectedPiece != null || currentState.editType == EditType.REMOVE) -> {
                 putPiece(currentState.selectedPiece, column, row)
             }
-
-            // Case 4: 一个格子上的棋子被选中，用户点击了另一个格子 -> 移动棋子
             currentState.selectedCell != null && currentState.selectedPiece != null -> {
                 putPiece(null, currentState.selectedCell.first, currentState.selectedCell.second)
                 putPiece(currentState.selectedPiece, column, row, pieceAtClickedCell?.id)
             }
-
-            // Case 5: No cell selected and clicked on empty cell -> do nothing
-            else -> {
-                // No action needed
-            }
+            else -> Unit
         }
     }
 
-    // 处理用于编辑局面的棋子被点击事件
     private fun handlePieceForEditClicked(removeMode: Boolean, piece: Piece?) {
         select(removeMode, piece, null, null)
     }
@@ -179,20 +257,130 @@ class EditModeViewModel : ViewModel() {
             selectedCell = null,
             selectedPiece = null,
             editType = EditType.NONE,
+            pendingFenToCopy = null,
+            fenExportDraft = null,
+        )
+    }
+
+    private fun handleExportFenClicked() {
+        val currentState = _state.value
+        val initialDraft = currentState.fenExportDraft ?: FenExportDraft(activeColor = currentState.playerColor)
+        _state.value = currentState.copy(
+            fenExportDraft = recomputeFenExportDraft(currentState, initialDraft)
+        )
+    }
+
+    private fun handleExportFenHandled() {
+        _state.value = _state.value.copy(pendingFenToCopy = null)
+    }
+
+    private fun handleDismissFenExportDialog() {
+        _state.value = _state.value.copy(fenExportDraft = null)
+    }
+
+    private fun handleConfirmFenExport() {
+        val currentState = _state.value
+        val draft = currentState.fenExportDraft ?: return
+        if (!draft.canConfirm || draft.previewFen.isBlank()) return
+        _state.value = currentState.copy(
+            pendingFenToCopy = draft.previewFen,
+            fenExportDraft = null,
+        )
+    }
+
+    private fun handleFenExportCastlingChanged(slot: FenCastlingSlot, enabled: Boolean) {
+        handleFenExportDraftChanged {
+            when (slot) {
+                FenCastlingSlot.WHITE_KINGSIDE -> copy(whiteKingsideCastling = enabled)
+                FenCastlingSlot.WHITE_QUEENSIDE -> copy(whiteQueensideCastling = enabled)
+                FenCastlingSlot.BLACK_KINGSIDE -> copy(blackKingsideCastling = enabled)
+                FenCastlingSlot.BLACK_QUEENSIDE -> copy(blackQueensideCastling = enabled)
+            }
+        }
+    }
+
+    private fun handleFenExportDraftChanged(transform: FenExportDraft.() -> FenExportDraft) {
+        val currentState = _state.value
+        val currentDraft = currentState.fenExportDraft ?: return
+        _state.value = currentState.copy(
+            fenExportDraft = recomputeFenExportDraft(currentState, currentDraft.transform())
+        )
+    }
+
+    private fun recomputeFenExportDraft(
+        state: EditModeState,
+        draft: FenExportDraft,
+    ): FenExportDraft {
+        val enPassantTargetInput = draft.enPassantTargetInput.ifBlank { "-" }
+        val castlingRights = buildString {
+            if (draft.whiteKingsideCastling) append('K')
+            if (draft.whiteQueensideCastling) append('Q')
+            if (draft.blackKingsideCastling) append('k')
+            if (draft.blackQueensideCastling) append('q')
+        }.ifEmpty { "-" }
+
+        val enPassantTarget = when (val normalized = enPassantTargetInput.trim().lowercase()) {
+            "", "-" -> null
+            else -> {
+                if (!Regex("^[a-h][36]$").matches(normalized)) {
+                    return draft.copy(
+                        enPassantTargetInput = enPassantTargetInput,
+                        previewFen = "",
+                        validationError = FenExportValidationError.INVALID_EN_PASSANT,
+                        canConfirm = false,
+                    )
+                }
+                Position.fromAlgebraic(normalized)
+            }
+        }
+
+        val halfMoveClock = draft.halfMoveClockInput.toIntOrNull()?.takeIf { it >= 0 }
+            ?: return draft.copy(
+                enPassantTargetInput = enPassantTargetInput,
+                previewFen = "",
+                validationError = FenExportValidationError.INVALID_HALF_MOVE_CLOCK,
+                canConfirm = false,
+            )
+
+        val fullMoveNumber = draft.fullMoveNumberInput.toIntOrNull()?.takeIf { it >= 1 }
+            ?: return draft.copy(
+                enPassantTargetInput = enPassantTargetInput,
+                previewFen = "",
+                validationError = FenExportValidationError.INVALID_FULL_MOVE_NUMBER,
+                canConfirm = false,
+            )
+
+        val fen = EditModeFenExporter.exportFen(
+            pieces = state.pieces,
+            boardPerspective = state.playerColor,
+            options = FenExportOptions(
+                activeColor = draft.activeColor,
+                castlingRights = castlingRights,
+                enPassantTarget = enPassantTarget,
+                halfMoveClock = halfMoveClock,
+                fullMoveNumber = fullMoveNumber,
+            )
+        )
+
+        return draft.copy(
+            enPassantTargetInput = enPassantTargetInput,
+            previewFen = fen,
+            validationError = null,
+            canConfirm = true,
         )
     }
 
     private fun select(removeMode: Boolean, piece: Piece?, cellColumn: Int?, cellRow: Int?) {
         if (removeMode) {
-            // 选中删除模式
             _state.value = _state.value.copy(
                 selectedCell = null,
                 selectedPiece = null,
-                editType = EditType.REMOVE
+                editType = EditType.REMOVE,
+                pendingFenToCopy = null,
+                fenExportDraft = null,
             )
             return
         }
-        // 选中一个棋盘上的棋子，或者编辑区的棋子
         val currentState = _state.value
         val toSelectCell = if (cellColumn != null && cellRow != null) Pair(cellColumn, cellRow) else null
         val toSelectPiece = if (currentState.selectedPiece?.equals(piece) ?: false) null else piece
@@ -203,9 +391,11 @@ class EditModeViewModel : ViewModel() {
             else -> EditType.NONE
         }
         _state.value = currentState.copy(
-            selectedCell =  toSelectCell,
+            selectedCell = toSelectCell,
             selectedPiece = toSelectPiece,
-            editType = editType
+            editType = editType,
+            pendingFenToCopy = null,
+            fenExportDraft = null,
         )
     }
 
@@ -222,8 +412,10 @@ class EditModeViewModel : ViewModel() {
         _state.value = currentState.copy(
             pieces = newPieces,
             selectedCell = null,
-            selectedPiece =  null,
+            selectedPiece = null,
             editType = EditType.NONE,
+            pendingFenToCopy = null,
+            fenExportDraft = null,
         )
     }
 }
