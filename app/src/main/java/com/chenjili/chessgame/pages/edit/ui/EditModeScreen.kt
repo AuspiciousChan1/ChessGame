@@ -19,6 +19,9 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -26,8 +29,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -44,6 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.chenjili.chess.api.Piece
 import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
@@ -51,10 +58,63 @@ import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.edit.ui.theme.ChessGameTheme
 
 @Composable
+private fun castlingUnavailableReasonText(slot: FenCastlingSlot, reason: FenCastlingUnavailableReason?): String? {
+    if (reason == null) return null
+    val reasons = ArrayList<String>(2)
+    val kingTextRes = when (slot) {
+        FenCastlingSlot.WHITE_KINGSIDE, FenCastlingSlot.WHITE_QUEENSIDE -> R.string.fen_export_reason_white_king_not_on_e1
+        FenCastlingSlot.BLACK_KINGSIDE, FenCastlingSlot.BLACK_QUEENSIDE -> R.string.fen_export_reason_black_king_not_on_e8
+    }
+    val rookTextRes = when (slot) {
+        FenCastlingSlot.WHITE_KINGSIDE -> R.string.fen_export_reason_white_rook_not_on_h1
+        FenCastlingSlot.WHITE_QUEENSIDE -> R.string.fen_export_reason_white_rook_not_on_a1
+        FenCastlingSlot.BLACK_KINGSIDE -> R.string.fen_export_reason_black_rook_not_on_h8
+        FenCastlingSlot.BLACK_QUEENSIDE -> R.string.fen_export_reason_black_rook_not_on_a8
+    }
+    if (reason == FenCastlingUnavailableReason.KING_NOT_ON_START || reason == FenCastlingUnavailableReason.KING_AND_ROOK_NOT_ON_START) {
+        reasons += stringResource(kingTextRes)
+    }
+    if (reason == FenCastlingUnavailableReason.ROOK_NOT_ON_START || reason == FenCastlingUnavailableReason.KING_AND_ROOK_NOT_ON_START) {
+        reasons += stringResource(rookTextRes)
+    }
+    return reasons.joinToString(separator = "\n")
+}
+
+@Composable
+private fun CastlingOptionRow(
+    slot: FenCastlingSlot,
+    checked: Boolean,
+    availability: FenCastlingOptionAvailability,
+    label: String,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(
+                checked = checked,
+                enabled = availability.enabled,
+                onCheckedChange = onCheckedChange,
+            )
+            Text(text = label)
+        }
+        val reasonText = castlingUnavailableReasonText(slot, availability.reason)
+        if (!availability.enabled && reasonText != null) {
+            Text(
+                text = reasonText,
+                color = Color.White.copy(alpha = 0.72f),
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 48.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun FenExportDialog(
     draft: FenExportDraft,
     onIntent: (EditModeIntent) -> Unit,
 ) {
+    var enPassantExpanded by remember(draft.activeColor, draft.enPassantTargetOptions) { mutableStateOf(false) }
     val validationTextRes = when (draft.validationError) {
         FenExportValidationError.INVALID_EN_PASSANT -> R.string.fen_export_error_invalid_en_passant
         FenExportValidationError.INVALID_HALF_MOVE_CLOCK -> R.string.fen_export_error_invalid_halfmove
@@ -101,46 +161,90 @@ private fun FenExportDialog(
                 }
 
                 Text(text = stringResource(R.string.fen_export_castling_rights))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = draft.whiteKingsideCastling,
-                            onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.WHITE_KINGSIDE, it)) }
-                        )
-                        Text(text = stringResource(R.string.fen_export_castling_white_kingside))
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = draft.whiteQueensideCastling,
-                            onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.WHITE_QUEENSIDE, it)) }
-                        )
-                        Text(text = stringResource(R.string.fen_export_castling_white_queenside))
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = draft.blackKingsideCastling,
-                            onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.BLACK_KINGSIDE, it)) }
-                        )
-                        Text(text = stringResource(R.string.fen_export_castling_black_kingside))
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = draft.blackQueensideCastling,
-                            onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.BLACK_QUEENSIDE, it)) }
-                        )
-                        Text(text = stringResource(R.string.fen_export_castling_black_queenside))
-                    }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    CastlingOptionRow(
+                        slot = FenCastlingSlot.WHITE_KINGSIDE,
+                        checked = draft.whiteKingsideCastling,
+                        availability = draft.castlingAvailability.whiteKingside,
+                        label = stringResource(R.string.fen_export_castling_white_kingside),
+                        onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.WHITE_KINGSIDE, it)) }
+                    )
+                    CastlingOptionRow(
+                        slot = FenCastlingSlot.WHITE_QUEENSIDE,
+                        checked = draft.whiteQueensideCastling,
+                        availability = draft.castlingAvailability.whiteQueenside,
+                        label = stringResource(R.string.fen_export_castling_white_queenside),
+                        onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.WHITE_QUEENSIDE, it)) }
+                    )
+                    CastlingOptionRow(
+                        slot = FenCastlingSlot.BLACK_KINGSIDE,
+                        checked = draft.blackKingsideCastling,
+                        availability = draft.castlingAvailability.blackKingside,
+                        label = stringResource(R.string.fen_export_castling_black_kingside),
+                        onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.BLACK_KINGSIDE, it)) }
+                    )
+                    CastlingOptionRow(
+                        slot = FenCastlingSlot.BLACK_QUEENSIDE,
+                        checked = draft.blackQueensideCastling,
+                        availability = draft.castlingAvailability.blackQueenside,
+                        label = stringResource(R.string.fen_export_castling_black_queenside),
+                        onCheckedChange = { onIntent(EditModeIntent.FenExportCastlingChanged(FenCastlingSlot.BLACK_QUEENSIDE, it)) }
+                    )
+                }
+                if (!draft.castlingAvailability.whiteKingside.enabled || !draft.castlingAvailability.whiteQueenside.enabled ||
+                    !draft.castlingAvailability.blackKingside.enabled || !draft.castlingAvailability.blackQueenside.enabled) {
+                    Text(
+                        text = stringResource(R.string.fen_export_castling_unavailable_hint),
+                        color = Color.White.copy(alpha = 0.72f)
+                    )
                 }
 
-                OutlinedTextField(
-                    value = draft.enPassantTargetInput,
-                    onValueChange = { onIntent(EditModeIntent.FenExportEnPassantChanged(it)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.fen_export_en_passant)) },
-                    placeholder = { Text(stringResource(R.string.fen_export_en_passant_hint)) },
-                    isError = draft.validationError == FenExportValidationError.INVALID_EN_PASSANT,
+                Box {
+                    OutlinedButton(
+                        onClick = { enPassantExpanded = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(text = stringResource(R.string.fen_export_en_passant))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(text = draft.enPassantTargetInput)
+                                Text(text = "▼")
+                            }
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = enPassantExpanded,
+                        onDismissRequest = { enPassantExpanded = false },
+                    ) {
+                        draft.enPassantTargetOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    enPassantExpanded = false
+                                    onIntent(EditModeIntent.FenExportEnPassantChanged(option))
+                                }
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = stringResource(
+                        if (draft.activeColor == PieceColor.WHITE) {
+                            R.string.fen_export_en_passant_white_to_move_hint
+                        } else {
+                            R.string.fen_export_en_passant_black_to_move_hint
+                        }
+                    ),
+                    color = Color.White.copy(alpha = 0.72f)
                 )
+
                 OutlinedTextField(
                     value = draft.halfMoveClockInput,
                     onValueChange = { onIntent(EditModeIntent.FenExportHalfMoveChanged(it)) },

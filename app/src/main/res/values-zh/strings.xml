@@ -73,4 +73,13 @@
     <string name="fen_export_error_invalid_en_passant">吃过路兵目标格必须为 - 或者第 3 / 6 行的合法格子。</string>
     <string name="fen_export_error_invalid_halfmove">半回合计数必须是大于等于 0 的整数。</string>
     <string name="fen_export_error_invalid_fullmove">全回合数必须是大于等于 1 的整数。</string>
+    <string name="fen_export_castling_unavailable_hint">被禁用的易位选项表示对应的王或车不在初始格。</string>
+    <string name="fen_export_en_passant_white_to_move_hint">当前白方行棋，因此只能选择第 6 行目标格。</string>
+    <string name="fen_export_en_passant_black_to_move_hint">当前黑方行棋，因此只能选择第 3 行目标格。</string>
+    <string name="fen_export_reason_white_king_not_on_e1">白王不在 e1</string>
+    <string name="fen_export_reason_black_king_not_on_e8">黑王不在 e8</string>
+    <string name="fen_export_reason_white_rook_not_on_h1">白车不在 h1</string>
+    <string name="fen_export_reason_white_rook_not_on_a1">白车不在 a1</string>
+    <string name="fen_export_reason_black_rook_not_on_h8">黑车不在 h8</string>
+    <string name="fen_export_reason_black_rook_not_on_a8">黑车不在 a8</string>
 </resources>

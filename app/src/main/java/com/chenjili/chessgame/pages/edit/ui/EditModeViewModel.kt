@@ -26,25 +26,136 @@ enum class FenExportValidationError {
     INVALID_FULL_MOVE_NUMBER,
 }
 
-data class FenExportDraft(
-    val activeColor: PieceColor = PieceColor.WHITE,
-    val whiteKingsideCastling: Boolean = false,
-    val whiteQueensideCastling: Boolean = false,
-    val blackKingsideCastling: Boolean = false,
-    val blackQueensideCastling: Boolean = false,
-    val enPassantTargetInput: String = "-",
-    val halfMoveClockInput: String = "0",
-    val fullMoveNumberInput: String = "1",
-    val previewFen: String = "",
-    val validationError: FenExportValidationError? = null,
-    val canConfirm: Boolean = true,
+enum class FenCastlingUnavailableReason {
+    KING_NOT_ON_START,
+    ROOK_NOT_ON_START,
+    KING_AND_ROOK_NOT_ON_START,
+}
+
+data class FenCastlingOptionAvailability(
+    val enabled: Boolean = true,
+    val reason: FenCastlingUnavailableReason? = null,
 )
 
-enum class FenCastlingSlot {
-    WHITE_KINGSIDE,
-    WHITE_QUEENSIDE,
-    BLACK_KINGSIDE,
-    BLACK_QUEENSIDE,
+data class FenCastlingAvailability(
+    val whiteKingside: FenCastlingOptionAvailability = FenCastlingOptionAvailability(),
+    val whiteQueenside: FenCastlingOptionAvailability = FenCastlingOptionAvailability(),
+    val blackKingside: FenCastlingOptionAvailability = FenCastlingOptionAvailability(),
+    val blackQueenside: FenCastlingOptionAvailability = FenCastlingOptionAvailability(),
+) {
+    fun optionFor(slot: FenCastlingSlot): FenCastlingOptionAvailability = when (slot) {
+        FenCastlingSlot.WHITE_KINGSIDE -> whiteKingside
+        FenCastlingSlot.WHITE_QUEENSIDE -> whiteQueenside
+        FenCastlingSlot.BLACK_KINGSIDE -> blackKingside
+        FenCastlingSlot.BLACK_QUEENSIDE -> blackQueenside
+    }
+}
+
+internal object EditModeFenExportRules {
+	private fun normalizePieces(
+		pieces: List<ChessPieceDisplay>,
+		boardPerspective: PieceColor,
+	): Map<Position, Piece> {
+		return pieces.associate { pieceDisplay ->
+			val position = if (boardPerspective == PieceColor.WHITE) {
+				Position(pieceDisplay.column, pieceDisplay.row)
+			} else {
+				Position(7 - pieceDisplay.column, 7 - pieceDisplay.row)
+			}
+			position to pieceDisplay.piece
+		}
+	}
+
+	fun buildEnPassantOptions(
+		activeColor: PieceColor,
+		pieces: List<ChessPieceDisplay>,
+		boardPerspective: PieceColor,
+	): List<String> {
+		val normalizedPieces = normalizePieces(pieces, boardPerspective)
+		val targets = sortedSetOf<String>()
+
+		fun pieceAt(file: Int, rank: Int): Piece? =
+			if (file in 0..7 && rank in 0..7) normalizedPieces[Position(file, rank)] else null
+
+		when (activeColor) {
+			PieceColor.WHITE -> {
+				for ((position, piece) in normalizedPieces) {
+					if (piece.type != PieceType.PAWN || piece.color != PieceColor.BLACK || position.rank != 4) continue
+					val targetRank = 5
+					val sourceRank = 6
+					val targetSquareEmpty = pieceAt(position.file, targetRank) == null
+					val sourceSquareEmpty = pieceAt(position.file, sourceRank) == null
+					val capturerExists = listOf(position.file - 1, position.file + 1).any { adjacentFile ->
+						pieceAt(adjacentFile, position.rank)?.let {
+							it.type == PieceType.PAWN && it.color == PieceColor.WHITE
+						} == true
+					}
+					if (targetSquareEmpty && sourceSquareEmpty && capturerExists) {
+						targets += Position(position.file, targetRank).toAlgebraic()
+					}
+				}
+			}
+			PieceColor.BLACK -> {
+				for ((position, piece) in normalizedPieces) {
+					if (piece.type != PieceType.PAWN || piece.color != PieceColor.WHITE || position.rank != 3) continue
+					val targetRank = 2
+					val sourceRank = 1
+					val targetSquareEmpty = pieceAt(position.file, targetRank) == null
+					val sourceSquareEmpty = pieceAt(position.file, sourceRank) == null
+					val capturerExists = listOf(position.file - 1, position.file + 1).any { adjacentFile ->
+						pieceAt(adjacentFile, position.rank)?.let {
+							it.type == PieceType.PAWN && it.color == PieceColor.BLACK
+						} == true
+					}
+					if (targetSquareEmpty && sourceSquareEmpty && capturerExists) {
+						targets += Position(position.file, targetRank).toAlgebraic()
+					}
+				}
+			}
+		}
+
+		return listOf("-") + targets.toList()
+	}
+
+	fun calculateCastlingAvailability(
+		pieces: List<ChessPieceDisplay>,
+		boardPerspective: PieceColor,
+	): FenCastlingAvailability {
+		val normalizedPieces = normalizePieces(pieces, boardPerspective)
+
+		fun hasPiece(position: String, type: PieceType, color: PieceColor): Boolean {
+			val parsedPosition = Position.fromAlgebraic(position) ?: return false
+			val piece = normalizedPieces[parsedPosition] ?: return false
+			return piece.type == type && piece.color == color
+		}
+
+		val whiteKingAtStart = hasPiece("e1", PieceType.KING, PieceColor.WHITE)
+		val blackKingAtStart = hasPiece("e8", PieceType.KING, PieceColor.BLACK)
+		val whiteKingsideRookAtStart = hasPiece("h1", PieceType.ROOK, PieceColor.WHITE)
+		val whiteQueensideRookAtStart = hasPiece("a1", PieceType.ROOK, PieceColor.WHITE)
+		val blackKingsideRookAtStart = hasPiece("h8", PieceType.ROOK, PieceColor.BLACK)
+		val blackQueensideRookAtStart = hasPiece("a8", PieceType.ROOK, PieceColor.BLACK)
+
+		fun buildOption(kingAtStart: Boolean, rookAtStart: Boolean): FenCastlingOptionAvailability {
+			val reason = when {
+				kingAtStart && rookAtStart -> null
+				!kingAtStart && !rookAtStart -> FenCastlingUnavailableReason.KING_AND_ROOK_NOT_ON_START
+				!kingAtStart -> FenCastlingUnavailableReason.KING_NOT_ON_START
+				else -> FenCastlingUnavailableReason.ROOK_NOT_ON_START
+			}
+			return FenCastlingOptionAvailability(
+				enabled = kingAtStart && rookAtStart,
+				reason = reason,
+			)
+		}
+
+		return FenCastlingAvailability(
+			whiteKingside = buildOption(whiteKingAtStart, whiteKingsideRookAtStart),
+			whiteQueenside = buildOption(whiteKingAtStart, whiteQueensideRookAtStart),
+			blackKingside = buildOption(blackKingAtStart, blackKingsideRookAtStart),
+			blackQueenside = buildOption(blackKingAtStart, blackQueensideRookAtStart),
+		)
+	}
 }
 
 internal object EditModeFenExporter {
@@ -97,8 +208,31 @@ enum class EditType {
     NONE,
     PUT,
     MOVE,
-    REMOVE
+    REMOVE,
 }
+
+enum class FenCastlingSlot {
+    WHITE_KINGSIDE,
+    WHITE_QUEENSIDE,
+    BLACK_KINGSIDE,
+    BLACK_QUEENSIDE,
+}
+
+data class FenExportDraft(
+    val activeColor: PieceColor = PieceColor.WHITE,
+    val whiteKingsideCastling: Boolean = false,
+    val whiteQueensideCastling: Boolean = false,
+    val blackKingsideCastling: Boolean = false,
+    val blackQueensideCastling: Boolean = false,
+    val castlingAvailability: FenCastlingAvailability = FenCastlingAvailability(),
+    val enPassantTargetInput: String = "-",
+    val enPassantTargetOptions: List<String> = listOf("-"),
+    val halfMoveClockInput: String = "0",
+    val fullMoveNumberInput: String = "1",
+    val previewFen: String = "",
+    val validationError: FenExportValidationError? = null,
+    val canConfirm: Boolean = true,
+)
 
 data class EditModeState(
     val playerColor: PieceColor = PieceColor.WHITE,
@@ -311,40 +445,56 @@ class EditModeViewModel : ViewModel() {
         state: EditModeState,
         draft: FenExportDraft,
     ): FenExportDraft {
-        val enPassantTargetInput = draft.enPassantTargetInput.ifBlank { "-" }
+        val castlingAvailability = EditModeFenExportRules.calculateCastlingAvailability(
+            pieces = state.pieces,
+            boardPerspective = state.playerColor,
+        )
+        val enPassantTargetOptions = EditModeFenExportRules.buildEnPassantOptions(
+			activeColor = draft.activeColor,
+			pieces = state.pieces,
+			boardPerspective = state.playerColor,
+		)
+        val normalizedEnPassantTarget = draft.enPassantTargetInput.ifBlank { "-" }
+            .trim()
+            .lowercase()
+            .let { if (it in enPassantTargetOptions) it else "-" }
+
+        val sanitizedDraft = draft.copy(
+            whiteKingsideCastling = draft.whiteKingsideCastling && castlingAvailability.whiteKingside.enabled,
+            whiteQueensideCastling = draft.whiteQueensideCastling && castlingAvailability.whiteQueenside.enabled,
+            blackKingsideCastling = draft.blackKingsideCastling && castlingAvailability.blackKingside.enabled,
+            blackQueensideCastling = draft.blackQueensideCastling && castlingAvailability.blackQueenside.enabled,
+            castlingAvailability = castlingAvailability,
+            enPassantTargetInput = normalizedEnPassantTarget,
+            enPassantTargetOptions = enPassantTargetOptions,
+        )
+
         val castlingRights = buildString {
-            if (draft.whiteKingsideCastling) append('K')
-            if (draft.whiteQueensideCastling) append('Q')
-            if (draft.blackKingsideCastling) append('k')
-            if (draft.blackQueensideCastling) append('q')
+            if (sanitizedDraft.whiteKingsideCastling) append('K')
+            if (sanitizedDraft.whiteQueensideCastling) append('Q')
+            if (sanitizedDraft.blackKingsideCastling) append('k')
+            if (sanitizedDraft.blackQueensideCastling) append('q')
         }.ifEmpty { "-" }
 
-        val enPassantTarget = when (val normalized = enPassantTargetInput.trim().lowercase()) {
-            "", "-" -> null
-            else -> {
-                if (!Regex("^[a-h][36]$").matches(normalized)) {
-                    return draft.copy(
-                        enPassantTargetInput = enPassantTargetInput,
-                        previewFen = "",
-                        validationError = FenExportValidationError.INVALID_EN_PASSANT,
-                        canConfirm = false,
-                    )
-                }
-                Position.fromAlgebraic(normalized)
-            }
+        val enPassantTarget = when (normalizedEnPassantTarget) {
+            "-" -> null
+            else -> Position.fromAlgebraic(normalizedEnPassantTarget)
+                ?: return sanitizedDraft.copy(
+                    previewFen = "",
+                    validationError = FenExportValidationError.INVALID_EN_PASSANT,
+                    canConfirm = false,
+                )
         }
 
-        val halfMoveClock = draft.halfMoveClockInput.toIntOrNull()?.takeIf { it >= 0 }
-            ?: return draft.copy(
-                enPassantTargetInput = enPassantTargetInput,
+        val halfMoveClock = sanitizedDraft.halfMoveClockInput.toIntOrNull()?.takeIf { it >= 0 }
+            ?: return sanitizedDraft.copy(
                 previewFen = "",
                 validationError = FenExportValidationError.INVALID_HALF_MOVE_CLOCK,
                 canConfirm = false,
             )
 
-        val fullMoveNumber = draft.fullMoveNumberInput.toIntOrNull()?.takeIf { it >= 1 }
-            ?: return draft.copy(
-                enPassantTargetInput = enPassantTargetInput,
+        val fullMoveNumber = sanitizedDraft.fullMoveNumberInput.toIntOrNull()?.takeIf { it >= 1 }
+            ?: return sanitizedDraft.copy(
                 previewFen = "",
                 validationError = FenExportValidationError.INVALID_FULL_MOVE_NUMBER,
                 canConfirm = false,
@@ -354,7 +504,7 @@ class EditModeViewModel : ViewModel() {
             pieces = state.pieces,
             boardPerspective = state.playerColor,
             options = FenExportOptions(
-                activeColor = draft.activeColor,
+                activeColor = sanitizedDraft.activeColor,
                 castlingRights = castlingRights,
                 enPassantTarget = enPassantTarget,
                 halfMoveClock = halfMoveClock,
@@ -362,8 +512,7 @@ class EditModeViewModel : ViewModel() {
             )
         )
 
-        return draft.copy(
-            enPassantTargetInput = enPassantTargetInput,
+        return sanitizedDraft.copy(
             previewFen = fen,
             validationError = null,
             canConfirm = true,

@@ -72,4 +72,13 @@
     <string name="fen_export_error_invalid_en_passant">En passant must be - or a valid square on rank 3/6.</string>
     <string name="fen_export_error_invalid_halfmove">Halfmove clock must be a number greater than or equal to 0.</string>
     <string name="fen_export_error_invalid_fullmove">Fullmove number must be a number greater than or equal to 1.</string>
+    <string name="fen_export_castling_unavailable_hint">Disabled castling options mean the king or rook is not on its starting square.</string>
+    <string name="fen_export_en_passant_white_to_move_hint">White to move: only rank 6 targets are possible.</string>
+    <string name="fen_export_en_passant_black_to_move_hint">Black to move: only rank 3 targets are possible.</string>
+    <string name="fen_export_reason_white_king_not_on_e1">White king is not on e1</string>
+    <string name="fen_export_reason_black_king_not_on_e8">Black king is not on e8</string>
+    <string name="fen_export_reason_white_rook_not_on_h1">White rook is not on h1</string>
+    <string name="fen_export_reason_white_rook_not_on_a1">White rook is not on a1</string>
+    <string name="fen_export_reason_black_rook_not_on_h8">Black rook is not on h8</string>
+    <string name="fen_export_reason_black_rook_not_on_a8">Black rook is not on a8</string>
 </resources>
