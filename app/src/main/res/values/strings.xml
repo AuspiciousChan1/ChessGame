@@ -40,4 +40,16 @@
     <string name="choose_surrendering_side">Choose which side surrenders:</string>
     <string name="white_surrenders">White Surrenders</string>
     <string name="black_surrenders">Black Surrenders</string>
+    <string name="cancel">Cancel</string>
+    <string name="import_confirm">Import</string>
+    <string name="import_fen">Import FEN</string>
+    <string name="import_pgn">Import PGN</string>
+    <string name="import_fen_title">Import position from FEN</string>
+    <string name="import_pgn_title">Import game from PGN</string>
+    <string name="import_fen_placeholder">Paste a FEN string here</string>
+    <string name="import_pgn_placeholder">Paste a PGN string here</string>
+    <string name="import_fen_error_empty">Please enter a FEN string</string>
+    <string name="import_pgn_error_empty">Please enter a PGN string</string>
+    <string name="import_fen_error_invalid">Invalid FEN format</string>
+    <string name="import_pgn_error_invalid">Invalid PGN format</string>
 </resources>

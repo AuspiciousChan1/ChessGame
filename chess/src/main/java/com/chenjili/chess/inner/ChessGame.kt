@@ -326,30 +326,37 @@ class ChessGame(override val id: String = UUID.randomUUID().toString()) : IChess
     }
     
     override fun importPGN(pgn: String): Boolean {
-        // Simplified PGN import - just parse moves
         try {
             reset()
-            
-            // Remove comments and extract moves
-            var cleanPgn = pgn.replace(Regex("\\{[^}]*\\}"), "")
-                .replace(Regex("\\([^)]*\\)"), "")
-                .replace(Regex("\\[[^\\]]*\\]"), "")
-            
-            // Extract move text (skip move numbers)
-            val movePattern = Regex("""([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?|O-O(-O)?)""")
-            val moves = movePattern.findAll(cleanPgn).map { it.value }.toList()
-            
-            for (moveStr in moves) {
-                // Parse and make move
-                val move = parseMoveFromAlgebraic(moveStr)
-                if (move == null) {
+
+            val cleanPgn = pgn
+                .replace(Regex("\\{[^}]*\\}"), " ")
+                .replace(Regex("\\([^)]*\\)"), " ")
+                .replace(Regex("\\[[^\\]]*\\]"), " ")
+                .replace(Regex("\\d+\\.(\\.\\.)?"), " ")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+
+            if (cleanPgn.isEmpty()) {
+                reset()
+                return false
+            }
+
+            val resultTokens = setOf("1-0", "0-1", "1/2-1/2", "*")
+            val tokens = cleanPgn.split(" ")
+
+            for (token in tokens) {
+                val moveToken = token.trim()
+                if (moveToken.isEmpty() || moveToken in resultTokens) continue
+
+                val move = parseMoveFromAlgebraic(moveToken)
+                if (move == null || makeMove(move.from, move.to, move.promotionPiece) == null) {
                     reset()
                     return false
                 }
-                makeMove(move.from, move.to, move.promotionPiece)
             }
-            
-            return true
+
+            return moveHistory.isNotEmpty()
         } catch (e: Exception) {
             reset()
             return false

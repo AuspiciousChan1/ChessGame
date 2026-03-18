@@ -2,7 +2,6 @@ package com.chenjili.chessgame.pages.chess.ui
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
 import com.chenjili.chess.api.ChessServiceFactory
 import com.chenjili.chess.api.GameState
 import com.chenjili.chess.api.IChessGame
@@ -14,7 +13,6 @@ import com.chenjili.chess.api.Position
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 data class ChessPieceDisplay (
     val piece: Piece,
@@ -29,6 +27,17 @@ data class ChessMove(
     val notation: String // e.g., "Nb1-c3"
 )
 
+enum class ImportFormat {
+    FEN,
+    PGN,
+}
+
+enum class ImportError {
+    EMPTY_INPUT,
+    INVALID_FEN,
+    INVALID_PGN,
+}
+
 // Pending pawn promotion info
 data class PendingPromotion(
     val from: Position,
@@ -42,6 +51,8 @@ sealed interface ChessIntent {
     data class RestartGame(val playerColor: PieceColor) : ChessIntent
     data class BoardCellClicked(val column: Int, val row: Int, val playerColor: PieceColor) : ChessIntent
     data class PromotionPieceSelected(val pieceType: PieceType) : ChessIntent
+    data class ImportRequested(val format: ImportFormat, val content: String) : ChessIntent
+    object ClearImportFeedback : ChessIntent
     object PromotionCancelled : ChessIntent
     object GameOverDialogDismissed : ChessIntent
     object UndoMove : ChessIntent
@@ -61,26 +72,23 @@ data class ChessState(
     val gameState: GameState = GameState.IN_PROGRESS, // 游戏状态
     val pendingPromotion: PendingPromotion? = null, // Pending promotion awaiting user choice
     val showSurrenderDialog: Boolean = false, // 是否展示投降确认框
+    val importError: ImportError? = null,
+    val importSuccessVersion: Long = 0,
+    val showGameOverDialog: Boolean = false,
 )
 
 class ChessViewModel(application: Application) : AndroidViewModel(application) {
-
-    companion object {
-        const val TAG = "ChessViewModel"
-    }
 
     private lateinit var chessGame: IChessGame
     private val _state = MutableStateFlow(ChessState())
     val state: StateFlow<ChessState> = _state.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            chessGame = ChessServiceFactory.chessService.createGame()
-            _state.value = ChessState(
-                pieces = initPieces(),
-                playerColor = PieceColor.WHITE
-            )
-        }
+        chessGame = ChessServiceFactory.chessService.createGame()
+        _state.value = rebuildStateFromGame(
+            baseState = ChessState(playerColor = PieceColor.WHITE),
+            playerColor = PieceColor.WHITE
+        )
     }
 
     private fun initPieces(): List<ChessPieceDisplay> {
@@ -118,6 +126,48 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         return initialPieces
     }
 
+    private fun buildMoveHistory(moves: List<Move>): List<ChessMove> {
+        return moves.map { move ->
+            ChessMove(
+                move = move,
+                playerColor = move.piece.color,
+                notation = getMoveNotation(move, isInCheck = false)
+            )
+        }
+    }
+
+    private fun rebuildStateFromGame(
+        baseState: ChessState = _state.value,
+        playerColor: PieceColor = baseState.playerColor,
+        importError: ImportError? = baseState.importError,
+        importSuccessVersion: Long = baseState.importSuccessVersion,
+        showGameOverDialog: Boolean? = null,
+    ): ChessState {
+        val gameState = chessGame.getGameState()
+        val resolvedShowGameOverDialog = showGameOverDialog ?: if (baseState.showGameOverDialog) {
+            true
+        } else {
+            !baseState.gameState.isGameOver() && gameState.isGameOver()
+        }
+        val baseDisplay = if (baseState.pieces.isNotEmpty()) baseState.pieces else initPieces()
+        return baseState.copy(
+            pieces = syncDisplayPieces(
+                boardPieces = chessGame.getAllPieces(),
+                currentDisplay = baseDisplay,
+                playerColor = playerColor
+            ),
+            playerColor = playerColor,
+            selectedCell = null,
+            moveHistory = buildMoveHistory(chessGame.getMoveHistory()),
+            gameState = gameState,
+            pendingPromotion = null,
+            showSurrenderDialog = false,
+            importError = importError,
+            importSuccessVersion = importSuccessVersion,
+            showGameOverDialog = resolvedShowGameOverDialog,
+        )
+    }
+
     // Helper function to get piece notation prefix
     private fun getPieceNotation(pieceType: PieceType): String {
         return when (pieceType) {
@@ -145,16 +195,15 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         val toFileStr = ('a' + move.to.file).toString()
         val toRankStr = (move.to.rank + 1).toString()
         val peaceTypeNotation = getPieceNotation(move.piece.type)
-        val bridge = if (move.capturedPiece != null || move.isEnPassant) "x" else "-"
-        val suf = if (move.promotionPiece != null) {
-            val promotionStr = getPieceNotation(move.promotionPiece!!)
-            "=$promotionStr"
-        } else if (move.isEnPassant) {
-            " e.p."
+        val bridge = if (move.capturedPiece != null || move.isEnPassant) "x" else ""
+        val suffixBase = when (val promotionPiece = move.promotionPiece) {
+            null -> if (move.isEnPassant) " e.p." else ""
+            else -> {
+                val promotionStr = getPieceNotation(promotionPiece)
+                "=$promotionStr"
+            }
         }
-        else {
-            ""
-        } + if (isInCheck) "+" else ""
+        val suf = suffixBase + if (isInCheck) "+" else ""
         return "$peaceTypeNotation$fromFileStr$fromRankStr$bridge$toFileStr$toRankStr$suf"
     }
 
@@ -165,6 +214,8 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             is ChessIntent.RestartGame -> handleRestartGame(intent.playerColor)
             is ChessIntent.BoardCellClicked -> handleBoardCellClicked(intent.column, intent.row)
             is ChessIntent.PromotionPieceSelected -> handlePromotionPieceSelected(intent.pieceType)
+            is ChessIntent.ImportRequested -> handleImportRequested(intent.format, intent.content)
+            is ChessIntent.ClearImportFeedback -> handleClearImportFeedback()
             is ChessIntent.PromotionCancelled -> handlePromotionCancelled()
             is ChessIntent.GameOverDialogDismissed -> handleGameOverDialogDismissed()
             is ChessIntent.UndoMove -> handleUndoMove()
@@ -176,33 +227,74 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun handlePlayerColorChanged(newColor: PieceColor) {
         val currentState = _state.value
-        val updatedPieces = currentState.pieces.map { piece ->
-            piece.copy(
-                row = 7 - piece.row,
-                column = 7 - piece.column
-            )
-        }
-        
-        _state.value = currentState.copy(
+        _state.value = rebuildStateFromGame(
+            baseState = currentState,
             playerColor = newColor,
-            pieces = updatedPieces,
-            selectedCell = null // Clear selection when switching sides
         )
     }
 
     private fun handleRestartGame(playerColor: PieceColor) {
         chessGame.reset()
-        _state.value = ChessState(
-            pieces = initPieces(),
+        _state.value = rebuildStateFromGame(
+            baseState = _state.value,
             playerColor = playerColor,
+            importError = null,
+            showGameOverDialog = false,
         )
+    }
+
+    private fun handleImportRequested(format: ImportFormat, content: String) {
+        val trimmedContent = content.trim()
+        if (trimmedContent.isEmpty()) {
+            _state.value = _state.value.copy(importError = ImportError.EMPTY_INPUT)
+            return
+        }
+
+        val importedGame = ChessServiceFactory.chessService.createGame()
+        val success = when (format) {
+            ImportFormat.FEN -> importedGame.importFEN(trimmedContent)
+            ImportFormat.PGN -> importedGame.importPGN(trimmedContent)
+        }
+
+        if (!success) {
+            ChessServiceFactory.chessService.deleteGame(importedGame.id)
+            _state.value = _state.value.copy(
+                importError = when (format) {
+                    ImportFormat.FEN -> ImportError.INVALID_FEN
+                    ImportFormat.PGN -> ImportError.INVALID_PGN
+                }
+            )
+            return
+        }
+
+        val previousGameId = chessGame.id
+        chessGame = importedGame
+        ChessServiceFactory.chessService.deleteGame(previousGameId)
+
+        val currentState = _state.value
+        _state.value = rebuildStateFromGame(
+            baseState = currentState,
+            playerColor = currentState.playerColor,
+            importError = null,
+            importSuccessVersion = currentState.importSuccessVersion + 1,
+            showGameOverDialog = false,
+        ).let { rebuiltState ->
+            if (rebuiltState.gameState.isGameOver()) {
+                rebuiltState.copy(showGameOverDialog = true)
+            } else {
+                rebuiltState
+            }
+        }
+    }
+
+    private fun handleClearImportFeedback() {
+        _state.value = _state.value.copy(importError = null)
     }
 
     /**
      * 处理棋盘格子点击事件
      * @param column 被点击的列 (0-7)，不受棋盘被翻转的影响
      * @param row 被点击的行 (0-7)，不受棋盘被翻转的影响
-     * @param playerColor 当前玩家颜色
      */
     private fun handleBoardCellClicked(column: Int, row: Int) {
         val playerColor = _state.value.playerColor
@@ -215,10 +307,10 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
         val currentState = _state.value
         val clickedCell = Pair(column, row)
-        
+
         // Find piece at clicked position
         val pieceAtClickedCell: ChessPieceDisplay? = currentState.pieces.find {
-            it.column == column && it.row == row 
+            it.column == column && it.row == row
         }
 
         val selectedPiece: ChessPieceDisplay? = currentState.selectedCell?.let { (selectedCol, selectedRow) ->
@@ -239,7 +331,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // Case 3: 当前没有棋子被选中，而且新格子中也没有棋子 -> 什么都不做
-            selectedPiece == null && pieceAtClickedCell != null  -> {
+            selectedPiece == null && pieceAtClickedCell == null  -> {
                 // No action needed
             }
 
@@ -259,22 +351,22 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     Position(7 - column, 7 - row)
                 }
-                
+
                 // Check if this is a pawn promotion move
                 val isPawnPromotion = selectedPiece.piece.type == PieceType.PAWN &&
                     ((selectedPiece.piece.color == PieceColor.WHITE && clickedPosition.rank == 7) ||
                      (selectedPiece.piece.color == PieceColor.BLACK && clickedPosition.rank == 0))
-                
+
                 // First check if move is legal
                 val legalMoves = chessGame.getLegalMoves(selectedPosition)
                 val isLegalMove = legalMoves.any { it.to == clickedPosition }
-                
+
                 if (!isLegalMove) {
                     // Illegal move - ignore
                     _state.value = currentState.copy(selectedCell = null)
                     return
                 }
-                
+
                 // If this is a pawn promotion, show the dialog instead of making the move
                 if (isPawnPromotion) {
                     _state.value = currentState.copy(
@@ -287,7 +379,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     return
                 }
-                
+
                 // Make the move (not a promotion)
                 val move: Move? = chessGame.makeMove(selectedPosition, clickedPosition)
                 if (move == null) {
@@ -295,113 +387,14 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                     _state.value = currentState.copy(selectedCell = null)
                     return
                 }
-                val isInCheck = chessGame.isInCheck(
-                    if (move.piece.color == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
-                )
-                val moveNotation = getMoveNotation(move, isInCheck)
 
-                val newMove = ChessMove(
-                    move = move,
-                    playerColor = playerColor,
-                    notation = moveNotation
-                )
-
-                // Remove piece at destination if exists (capture) and move selected piece
-                val updatedPieces = currentState.pieces.let { currentPieces ->
-                    // 吃子
-                    val withoutCaptured = if (move.capturedPiece != null) {
-                        val capturedPosition = if (move.isEnPassant) {
-                            // For en passant, the captured pawn is not on the target square
-                            val direction = if (selectedPiece.piece.color == PieceColor.WHITE) -1 else 1
-                            Position(move.to.file, move.to.rank + direction)
-                        } else {
-                            move.to.copy()
-                        }
-                        currentPieces.filterNot { p ->
-                            p.column == (if (playerColor == PieceColor.WHITE) capturedPosition.file else 7 - capturedPosition.file) &&
-                            p.row == (if (playerColor == PieceColor.WHITE) capturedPosition.rank else 7 - capturedPosition.rank)
-                        }
-                    } else {
-                        currentPieces
-                    }
-
-                    // 走子
-                    withoutCaptured.map { pieceDisplay ->
-                        if (pieceDisplay.column == selectedCol && pieceDisplay.row == selectedRow) {
-                            // Move the selected piece to the new location
-                            val peaceType = move.promotionPiece ?: pieceDisplay.piece.type
-                            val updatedPiece = pieceDisplay.piece.copy(type = peaceType)
-                            pieceDisplay.copy(
-                                piece = updatedPiece,
-                                column = column,
-                                row = row
-                            )
-                        } else if (move.isCastling && pieceDisplay.piece.type == PieceType.ROOK) {
-                            // 王车易位中车的移动
-                            if (selectedPiece.piece.color == PieceColor.WHITE) {
-                                // White castling
-                                if (move.to.file == 6 && move.to.rank == 0) {
-                                    // Kingside rook
-                                    if (playerColor == PieceColor.WHITE && pieceDisplay.column == 7 && pieceDisplay.row == 0) {
-                                        pieceDisplay.copy(column = 5, row = 0)
-                                    } else if (playerColor == PieceColor.BLACK && pieceDisplay.column == 0 && pieceDisplay.row == 7) {
-                                        pieceDisplay.copy(column = 2, row = 7)
-                                    } else {
-                                        pieceDisplay
-                                    }
-                                } else if (move.to.file == 2 && move.to.rank == 0) {
-                                    // Queenside rook
-                                    if (playerColor == PieceColor.WHITE && pieceDisplay.column == 0 && pieceDisplay.row == 0) {
-                                        pieceDisplay.copy(column = 3, row = 0)
-                                    } else if (playerColor == PieceColor.BLACK && pieceDisplay.column == 7 && pieceDisplay.row == 7) {
-                                        pieceDisplay.copy(column = 4, row = 7)
-                                    } else {
-                                        pieceDisplay
-                                    }
-                                } else {
-                                    pieceDisplay
-                                }
-                            } else {
-                                // Black castling
-                                if (move.to.file == 6 && move.to.rank == 7) {
-                                    // Kingside rook
-                                    if (playerColor == PieceColor.WHITE && pieceDisplay.column == 7 && pieceDisplay.row == 7) {
-                                        pieceDisplay.copy(column = 5, row = 7)
-                                    } else if (playerColor == PieceColor.BLACK && pieceDisplay.column == 0 && pieceDisplay.row == 0) {
-                                        pieceDisplay.copy(column = 2, row = 0)
-                                    } else {
-                                        pieceDisplay
-                                    }
-                                } else if (move.to.file == 2 && move.to.rank == 7) {
-                                    // Queenside rook
-                                    if (playerColor == PieceColor.WHITE && pieceDisplay.column == 0 && pieceDisplay.row == 7) {
-                                        pieceDisplay.copy(column = 3, row = 7)
-                                    } else if (playerColor == PieceColor.BLACK && pieceDisplay.column == 7 && pieceDisplay.row == 0) {
-                                        pieceDisplay.copy(column = 4, row = 0)
-                                    } else {
-                                        pieceDisplay
-                                    }
-                                } else {
-                                    pieceDisplay
-                                }
-                            }
-                        }
-                        else {
-                            pieceDisplay
-                        }
-                    }
-
-                }
-
-                val gameState: GameState = chessGame.getGameState()
-                _state.value = currentState.copy(
-                    pieces = updatedPieces,
-                    selectedCell = null,
-                    moveHistory = currentState.moveHistory + newMove,
-                    gameState = gameState,
+                _state.value = rebuildStateFromGame(
+                    baseState = currentState,
+                    playerColor = currentState.playerColor,
+                    importError = null,
                 )
             }
-            
+
             // Case 5: No cell selected and clicked on empty cell -> do nothing
             else -> {
                 // No action needed
@@ -416,118 +409,46 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     private fun cancelSelect() {
         _state.value = _state.value.copy(selectedCell = null)
     }
-    
+
     private fun handlePromotionPieceSelected(pieceType: PieceType) {
         val currentState = _state.value
         val pendingPromotion = currentState.pendingPromotion ?: return
-        
+
         // Make the move with the selected promotion piece
         val move: Move? = chessGame.makeMove(
             pendingPromotion.from,
             pendingPromotion.to,
             pieceType
         )
-        
+
         if (move == null) {
             // This shouldn't happen but handle gracefully
             _state.value = currentState.copy(pendingPromotion = null)
             return
         }
-        
-        val isInCheck = chessGame.isInCheck(
-            if (move.piece.color == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
-        )
-        val moveNotation = getMoveNotation(move, isInCheck)
-        
-        val newMove = ChessMove(
-            move = move,
+
+        _state.value = rebuildStateFromGame(
+            baseState = currentState,
             playerColor = currentState.playerColor,
-            notation = moveNotation
-        )
-        
-        // Update the board state
-        val playerColor = currentState.playerColor
-        val fromCol = if (playerColor == PieceColor.WHITE) pendingPromotion.from.file else 7 - pendingPromotion.from.file
-        val fromRow = if (playerColor == PieceColor.WHITE) pendingPromotion.from.rank else 7 - pendingPromotion.from.rank
-        val toCol = if (playerColor == PieceColor.WHITE) pendingPromotion.to.file else 7 - pendingPromotion.to.file
-        val toRow = if (playerColor == PieceColor.WHITE) pendingPromotion.to.rank else 7 - pendingPromotion.to.rank
-        
-        val updatedPieces = currentState.pieces.let { currentPieces ->
-            // Remove captured piece if exists
-            val withoutCaptured = if (move.capturedPiece != null) {
-                currentPieces.filterNot { p ->
-                    p.column == toCol && p.row == toRow
-                }
-            } else {
-                currentPieces
-            }
-            
-            // Move and promote the pawn
-            withoutCaptured.map { pieceDisplay ->
-                if (pieceDisplay.column == fromCol && pieceDisplay.row == fromRow) {
-                    // Promote the pawn to selected piece
-                    val updatedPiece = pieceDisplay.piece.copy(type = pieceType)
-                    pieceDisplay.copy(
-                        piece = updatedPiece,
-                        column = toCol,
-                        row = toRow
-                    )
-                } else {
-                    pieceDisplay
-                }
-            }
-        }
-        
-        _state.value = currentState.copy(
-            pieces = updatedPieces,
-            selectedCell = null,
-            pendingPromotion = null,
-            moveHistory = currentState.moveHistory + newMove
+            importError = null,
         )
     }
-    
+
     private fun handlePromotionCancelled() {
         _state.value = _state.value.copy(pendingPromotion = null)
     }
 
     private fun handleGameOverDialogDismissed() {
-
+        _state.value = _state.value.copy(showGameOverDialog = false)
     }
 
     private fun handleUndoMove() {
         if (chessGame.undoLastMove()) {
-            val currentState = _state.value
-
-            // 使用优化后的同步函数复用 ID
-            val updatedPieces = syncDisplayPieces(
-                chessGame.getAllPieces(),
-                currentState.pieces,
-                currentState.playerColor
-            )
-
-            // 重建移动历史
-            val updatedMoveHistory = mutableListOf<ChessMove>()
-            val gameMoveHistory = chessGame.getMoveHistory()
-            for (move in gameMoveHistory) {
-                val isInCheck = false
-                val moveNotation = getMoveNotation(move, isInCheck)
-                updatedMoveHistory.add(
-                    ChessMove(
-                        move = move,
-                        playerColor = currentState.playerColor,
-                        notation = moveNotation
-                    )
-                )
-            }
-
-            val gameState = chessGame.getGameState()
-
-            _state.value = currentState.copy(
-                pieces = updatedPieces,
-                selectedCell = null,
-                moveHistory = updatedMoveHistory,
-                gameState = gameState,
-                pendingPromotion = null
+            _state.value = rebuildStateFromGame(
+                baseState = _state.value,
+                playerColor = _state.value.playerColor,
+                importError = null,
+                showGameOverDialog = false,
             )
         }
     }
@@ -538,9 +459,11 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun handleSurrenderConfirmed(playerColor: PieceColor) {
         chessGame.resign(playerColor)
-        val gameState: GameState = chessGame.getGameState()
-        val showSurrenderDialog = false
-        _state.value = _state.value.copy(gameState = gameState, showSurrenderDialog = showSurrenderDialog)
+        _state.value = rebuildStateFromGame(
+            baseState = _state.value,
+            playerColor = _state.value.playerColor,
+            importError = null,
+        )
     }
 
     private fun handleSurrenderCancelled() {
@@ -559,7 +482,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         fun toDisplayCol(pos: Position): Int = if (playerColor == PieceColor.WHITE) pos.file else 7 - pos.file
         fun toDisplayRow(pos: Position): Int = if (playerColor == PieceColor.WHITE) pos.rank else 7 - pos.rank
 
-        // 目标棋盘：Position \-\> display(cell) 与 piece
+        // 目标棋盘：Position -> display(cell) 与 piece
         data class Cell(val col: Int, val row: Int)
         data class Target(val cell: Cell, val piece: Piece)
 
@@ -590,7 +513,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         // 记录哪些 target 已经被生成
         val usedTargetIndex = BooleanArray(targets.size)
 
-        // Step 1: 先匹配“未移动”：同格 \+ piece 完全相同 \-\> 直接复用该格子的 ID
+        // Step 1: 先匹配“未移动”：同格 + piece 完全相同 -> 直接复用该格子的 ID
         for ((i, t) in targets.withIndex()) {
             val cur = currentByCell[t.cell]
             if (cur != null && cur.piece == t.piece) {
@@ -612,8 +535,21 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Step 3: 处理升变：若目标是兵，但 Step2 没找到同兵（常见于撤销升变：当前 UI 还保留着升变后的后/车/象/马）
-        // \- 规则：同 color 的“非兵”可以被视作这枚兵的前身，复用其 ID（从 remainingCurrent 里取）
+        // Step 3a: 处理升变前进：目标是非兵，但当前剩余池里可能还是同色兵，应复用兵的 ID
+        for ((i, t) in targets.withIndex()) {
+            if (usedTargetIndex[i]) continue
+            if (t.piece.type == PieceType.PAWN) continue
+
+            val promotionForwardMatch = takeFirst {
+                it.piece.color == t.piece.color && it.piece.type == PieceType.PAWN
+            }
+            if (promotionForwardMatch != null) {
+                result.add(promotionForwardMatch.copy(piece = t.piece, column = t.cell.col, row = t.cell.row))
+                usedTargetIndex[i] = true
+            }
+        }
+
+        // Step 3b: 处理升变回退：目标是兵，但当前 UI 还保留着升变后的后/车/象/马
         for ((i, t) in targets.withIndex()) {
             if (usedTargetIndex[i]) continue
             if (t.piece.type != PieceType.PAWN) continue

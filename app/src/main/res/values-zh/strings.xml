@@ -41,4 +41,16 @@
     <string name="choose_surrendering_side">选择要投降的一方</string>
     <string name="white_surrenders">白方投降</string>
     <string name="black_surrenders">黑方投降</string>
+    <string name="cancel">取消</string>
+    <string name="import_confirm">导入</string>
+    <string name="import_fen">导入 FEN</string>
+    <string name="import_pgn">导入 PGN</string>
+    <string name="import_fen_title">通过 FEN 导入局面</string>
+    <string name="import_pgn_title">通过 PGN 导入对局</string>
+    <string name="import_fen_placeholder">请粘贴 FEN 字符串</string>
+    <string name="import_pgn_placeholder">请粘贴 PGN 字符串</string>
+    <string name="import_fen_error_empty">请输入 FEN 字符串</string>
+    <string name="import_pgn_error_empty">请输入 PGN 字符串</string>
+    <string name="import_fen_error_invalid">FEN 格式不正确</string>
+    <string name="import_pgn_error_invalid">PGN 格式不正确</string>
 </resources>

@@ -554,4 +554,27 @@ class ChessGameTest {
         game.undoLastMove()
         assertEquals(0, game.getUndoCount())
     }
+
+    @Test
+    fun testPGNImportBuildsMoveHistoryAndBoard() {
+        val pgn = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6"
+
+        assertTrue(game.importPGN(pgn))
+
+        assertEquals(6, game.getMoveHistory().size)
+        assertEquals(PieceType.PAWN, game.getPieceAt(Position.fromAlgebraic("e4")!!)?.type)
+        assertEquals(PieceType.PAWN, game.getPieceAt(Position.fromAlgebraic("e5")!!)?.type)
+        assertEquals(PieceType.KNIGHT, game.getPieceAt(Position.fromAlgebraic("f3")!!)?.type)
+        assertEquals(PieceType.KNIGHT, game.getPieceAt(Position.fromAlgebraic("c6")!!)?.type)
+        assertEquals(PieceType.BISHOP, game.getPieceAt(Position.fromAlgebraic("b5")!!)?.type)
+        assertEquals(PieceType.PAWN, game.getPieceAt(Position.fromAlgebraic("a6")!!)?.type)
+        assertEquals(PieceColor.WHITE, game.getActiveColor())
+    }
+
+    @Test
+    fun testPGNImportInvalidKeepsInitialPosition() {
+        assertFalse(game.importPGN("1. e4 invalidMove"))
+        assertEquals(0, game.getMoveHistory().size)
+        assertEquals("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", game.exportFEN())
+    }
 }
