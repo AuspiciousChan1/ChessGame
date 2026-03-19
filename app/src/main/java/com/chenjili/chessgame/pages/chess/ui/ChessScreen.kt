@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,14 +38,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +89,7 @@ import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
 import com.chenjili.chessgame.R
 import com.chenjili.chessgame.pages.chess.ui.theme.ChessGameTheme
+import java.util.Locale
 
 @Composable
 private fun WalnutActionButton(
@@ -551,11 +560,21 @@ fun ChessScreen(
     onIntent: (ChessIntent) -> Unit = { }
 ) {
     var importDialogFormat by rememberSaveable { mutableStateOf<ImportFormat?>(null) }
+    val contentScrollState = rememberScrollState()
+    val analysisBringIntoViewRequester = remember { BringIntoViewRequester() }
 
     LaunchedEffect(state.importSuccessVersion) {
         if (importDialogFormat != null && state.importSuccessVersion > 0) {
             importDialogFormat = null
             onIntent(ChessIntent.ClearImportFeedback)
+        }
+    }
+
+    LaunchedEffect(state.isAnalyzing, state.analysisFen, state.positionFen, state.analysisRecommendations.size) {
+        val hasVisibleAnalysis = state.analysisRecommendations.isNotEmpty()
+        val analysisMatchesCurrentPosition = state.analysisFen != null && state.analysisFen == state.positionFen
+        if (state.isAnalyzing || (hasVisibleAnalysis && analysisMatchesCurrentPosition)) {
+            analysisBringIntoViewRequester.bringIntoView()
         }
     }
 
@@ -584,6 +603,7 @@ fun ChessScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .verticalScroll(contentScrollState)
                         .padding(paddingDp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top
@@ -706,6 +726,21 @@ fun ChessScreen(
                             .fillMaxWidth()
                     )
 
+                    AnalysisPanel(
+                        analysisEnabled = state.analysisEnabled,
+                        isAnalyzing = state.isAnalyzing,
+                        recommendations = state.analysisRecommendations,
+                        analysisMatchesCurrentPosition = state.analysisFen != null && state.analysisFen == state.positionFen,
+                        onAnalysisEnabledChanged = { enabled ->
+                            onIntent(ChessIntent.ToggleAnalysis(enabled))
+                        },
+                        modifier = Modifier
+                            .padding(top = 10.dp)
+                            .bringIntoViewRequester(analysisBringIntoViewRequester)
+                            .widthIn(max = squareSize)
+                            .fillMaxWidth()
+                    )
+
                     // 胡桃木风格的横向滚动工具条，预留空间
                     Box(
                         modifier = Modifier
@@ -818,7 +853,7 @@ fun ChessScreen(
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(180.dp)
+                                .height(160.dp)
                                 .background(colorResource(R.color.walnut_light), RoundedCornerShape(10.dp))
                                 .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(10.dp))
                                 .padding(8.dp),
@@ -903,6 +938,219 @@ fun ChessScreen(
             }
         }
     }
+}
+
+@Composable
+private fun AnalysisPanel(
+    analysisEnabled: Boolean,
+    isAnalyzing: Boolean,
+    recommendations: List<AnalysisRecommendationDisplay>,
+    analysisMatchesCurrentPosition: Boolean,
+    onAnalysisEnabledChanged: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val bestMove = recommendations.firstOrNull()
+    val shouldShowRecommendations = recommendations.isNotEmpty() && (analysisMatchesCurrentPosition || isAnalyzing)
+    Box(
+        modifier = modifier
+            .shadow(10.dp, RoundedCornerShape(14.dp))
+            .background(colorResource(R.color.walnut_medium), RoundedCornerShape(14.dp))
+            .border(
+                BorderStroke(
+                    1.5.dp,
+                    if (analysisEnabled) colorResource(R.color.walnut_accent) else colorResource(R.color.walnut_dark)
+                ),
+                RoundedCornerShape(14.dp)
+            )
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = stringResource(R.string.analysis_auto_title),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = stringResource(
+                            if (analysisEnabled) {
+                                R.string.analysis_auto_subtitle_enabled
+                            } else {
+                                R.string.analysis_auto_subtitle_disabled
+                            }
+                        ),
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.78f),
+                    )
+                }
+
+                Switch(
+                    checked = analysisEnabled,
+                    onCheckedChange = onAnalysisEnabledChanged,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = colorResource(R.color.walnut_accent),
+                        checkedTrackColor = colorResource(R.color.walnut_light),
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = colorResource(R.color.walnut_dark),
+                    )
+                )
+            }
+
+            if (analysisEnabled) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(colorResource(R.color.walnut_grain))
+                )
+
+                when {
+                    isAnalyzing && bestMove == null -> {
+                        Text(
+                            text = stringResource(R.string.analysis_running),
+                            color = Color.White,
+                            fontSize = 13.sp,
+                        )
+                    }
+
+                    bestMove == null -> {
+                        Text(
+                            text = stringResource(R.string.analysis_waiting_for_move),
+                            color = Color.White,
+                            fontSize = 13.sp,
+                        )
+                    }
+
+                    else -> {
+                        AnalysisSummaryBanner(
+                            bestMove = bestMove,
+                            isAnalyzing = isAnalyzing,
+                            analysisMatchesCurrentPosition = analysisMatchesCurrentPosition,
+                        )
+
+                        if (shouldShowRecommendations) {
+                            Text(
+                                text = stringResource(R.string.analysis_recommendations),
+                                color = colorResource(R.color.walnut_accent),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            recommendations.forEachIndexed { index, recommendation ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${index + 1}.",
+                                        color = Color.White,
+                                        modifier = Modifier.width(24.dp),
+                                        fontSize = 13.sp,
+                                    )
+                                    Text(
+                                        text = recommendation.notation,
+                                        color = Color.White,
+                                        modifier = Modifier.weight(1f),
+                                        fontSize = 13.sp,
+                                    )
+                                    Text(
+                                        text = formatAnalysisScore(recommendation.scoreCp),
+                                        color = colorResource(R.color.walnut_accent),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnalysisSummaryBanner(
+    bestMove: AnalysisRecommendationDisplay,
+    isAnalyzing: Boolean,
+    analysisMatchesCurrentPosition: Boolean,
+) {
+    val statusTextRes = when {
+        isAnalyzing && analysisMatchesCurrentPosition -> R.string.analysis_status_refreshing
+        isAnalyzing -> R.string.analysis_status_updating_with_previous
+        analysisMatchesCurrentPosition -> R.string.analysis_status_ready
+        else -> R.string.analysis_status_previous_position
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colorResource(R.color.walnut_light), RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(colorResource(R.color.walnut_accent), CircleShape)
+                )
+                Text(
+                    text = stringResource(statusTextRes),
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+
+            Text(
+                text = stringResource(R.string.analysis_best_move),
+                color = colorResource(R.color.walnut_accent),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = bestMove.notation,
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = formatAnalysisScore(bestMove.scoreCp),
+                    color = colorResource(R.color.walnut_accent),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+    }
+}
+
+private fun formatAnalysisScore(scoreCp: Int): String {
+    return String.format(Locale.US, "%+.2f", scoreCp / 100f)
 }
 
 @Composable

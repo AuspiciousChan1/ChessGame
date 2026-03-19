@@ -1,5 +1,6 @@
 package com.chenjili.chess.inner
 
+import android.util.Log
 import com.chenjili.chess.api.AnalysisRequest
 import com.chenjili.chess.api.AnalysisResult
 import com.chenjili.chess.api.AnalysisSource
@@ -22,12 +23,20 @@ class UciStockfishAnalyzer(
     private val command: List<String>,
 ) : IPositionAnalyzer {
 
+    companion object {
+        private const val TAG = "UciStockfishAnalyzer"
+    }
+
     override fun analyze(fen: String, legalMoves: List<Move>, request: AnalysisRequest): AnalysisResult? {
         if (command.isEmpty()) return null
 
-        val process = ProcessBuilder(command)
-            .redirectErrorStream(true)
-            .start()
+        val process = runCatching {
+            ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .start()
+        }.onFailure { throwable ->
+            Log.w(TAG, "Failed to start UCI engine process: $command", throwable)
+        }.getOrNull() ?: return null
 
         return process.useUci { reader, writer ->
             writer.send("uci")
@@ -151,4 +160,3 @@ class UciStockfishAnalyzer(
         return from.toAlgebraic() + to.toAlgebraic() + promotionSuffix
     }
 }
-

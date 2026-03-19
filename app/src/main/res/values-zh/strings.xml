@@ -84,4 +84,15 @@
     <string name="fen_export_reason_black_rook_not_on_a8">黑车不在 a8</string>
     <string name="analysis_engine_status_stockfish">分析引擎：Stockfish</string>
     <string name="analysis_engine_status_heuristic">分析引擎：内置启发式回退</string>
+    <string name="analysis_auto_title">自动分析</string>
+    <string name="analysis_auto_subtitle_enabled">开启后每次走棋都会分析</string>
+    <string name="analysis_auto_subtitle_disabled">默认关闭</string>
+    <string name="analysis_running">正在分析当前局面…</string>
+    <string name="analysis_waiting_for_move">走一步后即可查看推荐着法。</string>
+    <string name="analysis_recommendations">推荐着法</string>
+    <string name="analysis_best_move">最佳着法</string>
+    <string name="analysis_status_ready">当前局面分析已完成</string>
+    <string name="analysis_status_refreshing">正在刷新当前局面的分析…</string>
+    <string name="analysis_status_updating_with_previous">正在更新… 当前先展示上一次可见结果</string>
+    <string name="analysis_status_previous_position">当前展示的是上一局面的最近可见结果</string>
 </resources>

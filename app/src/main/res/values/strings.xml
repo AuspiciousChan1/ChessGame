@@ -83,4 +83,15 @@
     <string name="fen_export_reason_black_rook_not_on_a8">Black rook is not on a8</string>
     <string name="analysis_engine_status_stockfish">Analysis engine: Stockfish</string>
     <string name="analysis_engine_status_heuristic">Analysis engine: built-in heuristic fallback</string>
+    <string name="analysis_auto_title">Auto analysis</string>
+    <string name="analysis_auto_subtitle_enabled">Runs after every move</string>
+    <string name="analysis_auto_subtitle_disabled">Off by default</string>
+    <string name="analysis_running">Analyzing current position...</string>
+    <string name="analysis_waiting_for_move">Make a move to get recommendations.</string>
+    <string name="analysis_recommendations">Recommended next moves</string>
+    <string name="analysis_best_move">Best move</string>
+    <string name="analysis_status_ready">Analysis ready for current position</string>
+    <string name="analysis_status_refreshing">Refreshing analysis for current position…</string>
+    <string name="analysis_status_updating_with_previous">Updating… showing the last visible result</string>
+    <string name="analysis_status_previous_position">Last visible result from a previous position</string>
 </resources>

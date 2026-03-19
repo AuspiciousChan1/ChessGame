@@ -2,6 +2,9 @@ package com.chenjili.chessgame.pages.chess.ui
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.chenjili.chess.api.AnalysisRequest
+import com.chenjili.chess.api.AnalysisResult
 import com.chenjili.chess.api.ChessServiceFactory
 import com.chenjili.chess.api.GameState
 import com.chenjili.chess.api.IChessGame
@@ -11,9 +14,13 @@ import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
 import com.chenjili.chess.api.Position
 import com.chenjili.chessgame.pages.chess.data.StockfishAnalyzerProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class ChessPieceDisplay (
     val piece: Piece,
@@ -26,6 +33,11 @@ data class ChessMove(
     val move: Move,
     val playerColor: PieceColor,
     val notation: String // e.g., "Nb1-c3"
+)
+
+data class AnalysisRecommendationDisplay(
+    val notation: String,
+    val scoreCp: Int,
 )
 
 enum class ImportFormat {
@@ -53,6 +65,7 @@ sealed interface ChessIntent {
     data class BoardCellClicked(val column: Int, val row: Int, val playerColor: PieceColor) : ChessIntent
     data class PromotionPieceSelected(val pieceType: PieceType) : ChessIntent
     data class ImportRequested(val format: ImportFormat, val content: String) : ChessIntent
+    data class ToggleAnalysis(val enabled: Boolean) : ChessIntent
     object ClearImportFeedback : ChessIntent
     object PromotionCancelled : ChessIntent
     object GameOverDialogDismissed : ChessIntent
@@ -88,6 +101,11 @@ data class ChessState(
     val importSuccessVersion: Long = 0,
     val showGameOverDialog: Boolean = false,
     val analysisEngineStatus: AnalysisEngineStatus = AnalysisEngineStatus.HEURISTIC_FALLBACK,
+    val analysisEnabled: Boolean = false,
+    val isAnalyzing: Boolean = false,
+    val positionFen: String = "",
+    val analysisFen: String? = null,
+    val analysisRecommendations: List<AnalysisRecommendationDisplay> = emptyList(),
 )
 
 class ChessViewModel(application: Application) : AndroidViewModel(application) {
@@ -96,6 +114,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     private val stockfishAnalyzerProvider = StockfishAnalyzerProvider(application.applicationContext)
     private val _state = MutableStateFlow(ChessState())
     val state: StateFlow<ChessState> = _state.asStateFlow()
+    private var analysisJob: Job? = null
 
     init {
         val initialGame = ChessServiceFactory.chessService.createGame()
@@ -105,10 +124,22 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             baseState = ChessState(
                 playerColor = PieceColor.WHITE,
                 analysisEngineStatus = analysisEngineStatus,
+                analysisEnabled = false,
             ),
             playerColor = PieceColor.WHITE,
             analysisEngineStatus = analysisEngineStatus,
+            analysisEnabled = false,
+            isAnalyzing = false,
+            analysisRecommendations = emptyList(),
         )
+    }
+
+    override fun onCleared() {
+        analysisJob?.cancel()
+        if (::chessGame.isInitialized) {
+            ChessServiceFactory.chessService.deleteGame(chessGame.id)
+        }
+        super.onCleared()
     }
 
     private fun attachAnalyzer(game: IChessGame): AnalysisEngineStatus {
@@ -169,6 +200,9 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         importSuccessVersion: Long = baseState.importSuccessVersion,
         showGameOverDialog: Boolean? = null,
         analysisEngineStatus: AnalysisEngineStatus = baseState.analysisEngineStatus,
+        analysisEnabled: Boolean = baseState.analysisEnabled,
+        isAnalyzing: Boolean = baseState.isAnalyzing,
+        analysisRecommendations: List<AnalysisRecommendationDisplay> = baseState.analysisRecommendations,
     ): ChessState {
         val gameState = chessGame.getGameState()
         val resolvedShowGameOverDialog = showGameOverDialog ?: if (baseState.showGameOverDialog) {
@@ -193,6 +227,11 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             importSuccessVersion = importSuccessVersion,
             showGameOverDialog = resolvedShowGameOverDialog,
             analysisEngineStatus = analysisEngineStatus,
+            analysisEnabled = analysisEnabled,
+            isAnalyzing = isAnalyzing,
+            positionFen = chessGame.exportFEN(),
+            analysisFen = baseState.analysisFen,
+            analysisRecommendations = analysisRecommendations,
         )
     }
 
@@ -243,6 +282,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             is ChessIntent.BoardCellClicked -> handleBoardCellClicked(intent.column, intent.row)
             is ChessIntent.PromotionPieceSelected -> handlePromotionPieceSelected(intent.pieceType)
             is ChessIntent.ImportRequested -> handleImportRequested(intent.format, intent.content)
+            is ChessIntent.ToggleAnalysis -> handleToggleAnalysis(intent.enabled)
             is ChessIntent.ClearImportFeedback -> handleClearImportFeedback()
             is ChessIntent.PromotionCancelled -> handlePromotionCancelled()
             is ChessIntent.GameOverDialogDismissed -> handleGameOverDialogDismissed()
@@ -262,12 +302,15 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun handleRestartGame(playerColor: PieceColor) {
+        analysisJob?.cancel()
         chessGame.reset()
         _state.value = rebuildStateFromGame(
             baseState = _state.value,
             playerColor = playerColor,
             importError = null,
             showGameOverDialog = false,
+            isAnalyzing = false,
+            analysisRecommendations = emptyList(),
         )
     }
 
@@ -296,6 +339,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
+        analysisJob?.cancel()
         val previousGameId = chessGame.id
         chessGame = importedGame
         ChessServiceFactory.chessService.deleteGame(previousGameId)
@@ -308,6 +352,8 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             importSuccessVersion = currentState.importSuccessVersion + 1,
             showGameOverDialog = false,
             analysisEngineStatus = analysisEngineStatus,
+            isAnalyzing = false,
+            analysisRecommendations = emptyList(),
         ).let { rebuiltState ->
             if (rebuiltState.gameState.isGameOver()) {
                 rebuiltState.copy(showGameOverDialog = true)
@@ -315,6 +361,25 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                 rebuiltState
             }
         }
+    }
+
+    private fun handleToggleAnalysis(enabled: Boolean) {
+        if (!enabled) {
+            analysisJob?.cancel()
+            _state.value = _state.value.copy(
+                analysisEnabled = false,
+                isAnalyzing = false,
+                analysisFen = null,
+                analysisRecommendations = emptyList(),
+            )
+            return
+        }
+
+        _state.value = _state.value.copy(
+            analysisEnabled = true,
+            isAnalyzing = false,
+        )
+        requestPostMoveAnalysisIfNeeded()
     }
 
     private fun handleClearImportFeedback() {
@@ -422,7 +487,10 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
                     baseState = currentState,
                     playerColor = currentState.playerColor,
                     importError = null,
+                    isAnalyzing = false,
+                    analysisRecommendations = currentState.analysisRecommendations,
                 )
+                requestPostMoveAnalysisIfNeeded()
             }
 
             // Case 5: No cell selected and clicked on empty cell -> do nothing
@@ -461,7 +529,10 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             baseState = currentState,
             playerColor = currentState.playerColor,
             importError = null,
+            isAnalyzing = false,
+            analysisRecommendations = currentState.analysisRecommendations,
         )
+        requestPostMoveAnalysisIfNeeded()
     }
 
     private fun handlePromotionCancelled() {
@@ -474,12 +545,17 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun handleUndoMove() {
         if (chessGame.undoLastMove()) {
+            analysisJob?.cancel()
+            val currentState = _state.value
             _state.value = rebuildStateFromGame(
-                baseState = _state.value,
-                playerColor = _state.value.playerColor,
+                baseState = currentState,
+                playerColor = currentState.playerColor,
                 importError = null,
                 showGameOverDialog = false,
+                isAnalyzing = false,
+                analysisRecommendations = currentState.analysisRecommendations,
             )
+            requestPostMoveAnalysisIfNeeded()
         }
     }
 
@@ -488,16 +564,79 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun handleSurrenderConfirmed(playerColor: PieceColor) {
+        analysisJob?.cancel()
         chessGame.resign(playerColor)
         _state.value = rebuildStateFromGame(
             baseState = _state.value,
             playerColor = _state.value.playerColor,
             importError = null,
+            isAnalyzing = false,
+            analysisRecommendations = emptyList(),
         )
     }
 
     private fun handleSurrenderCancelled() {
         _state.value = _state.value.copy(showSurrenderDialog = false)
+    }
+
+    private fun requestPostMoveAnalysisIfNeeded() {
+        val currentState = _state.value
+        if (!currentState.analysisEnabled || currentState.gameState.isGameOver()) {
+            analysisJob?.cancel()
+            _state.value = currentState.copy(isAnalyzing = false)
+            return
+        }
+
+        analysisJob?.cancel()
+        val fen = chessGame.exportFEN()
+        val sourceGameId = chessGame.id
+        val snapshotGame = ChessServiceFactory.chessService.createGame()
+        if (!snapshotGame.importFEN(fen)) {
+            ChessServiceFactory.chessService.deleteGame(snapshotGame.id)
+            _state.value = currentState.copy(isAnalyzing = false)
+            return
+        }
+        attachAnalyzer(snapshotGame)
+
+        _state.value = currentState.copy(isAnalyzing = true)
+
+        analysisJob = viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    runCatching {
+                        snapshotGame.analyzeNextMoves(AnalysisRequest())
+                    }.getOrNull()
+                } finally {
+                    ChessServiceFactory.chessService.deleteGame(snapshotGame.id)
+                }
+            }
+
+            val latestState = _state.value
+            if (!latestState.analysisEnabled) {
+                _state.value = latestState.copy(isAnalyzing = false)
+                return@launch
+            }
+
+            val samePosition = chessGame.id == sourceGameId && chessGame.exportFEN() == fen
+            if (!samePosition) {
+                return@launch
+            }
+
+            _state.value = latestState.copy(
+                isAnalyzing = false,
+                analysisFen = fen,
+                analysisRecommendations = buildAnalysisRecommendations(result),
+            )
+        }
+    }
+
+    private fun buildAnalysisRecommendations(result: AnalysisResult?): List<AnalysisRecommendationDisplay> {
+        return result?.recommendations?.map { recommendation ->
+            AnalysisRecommendationDisplay(
+                notation = getMoveNotation(recommendation.move, isInCheck = false),
+                scoreCp = recommendation.scoreCp,
+            )
+        }.orEmpty()
     }
 
     /**
