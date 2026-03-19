@@ -10,6 +10,7 @@ import com.chenjili.chess.api.Piece
 import com.chenjili.chess.api.PieceColor
 import com.chenjili.chess.api.PieceType
 import com.chenjili.chess.api.Position
+import com.chenjili.chessgame.pages.chess.data.StockfishAnalyzerProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,6 +64,17 @@ sealed interface ChessIntent {
     object SurrenderCancelled : ChessIntent
 }
 
+enum class AnalysisEngineStatus {
+    STOCKFISH,
+    HEURISTIC_FALLBACK,
+}
+
+internal object AnalysisEngineStatusResolver {
+    fun fromAnalyzerAvailable(isAvailable: Boolean): AnalysisEngineStatus {
+        return if (isAvailable) AnalysisEngineStatus.STOCKFISH else AnalysisEngineStatus.HEURISTIC_FALLBACK
+    }
+}
+
 // MVI: State - 表示整个UI状态
 data class ChessState(
     val pieces: List<ChessPieceDisplay> = emptyList(),
@@ -75,20 +87,34 @@ data class ChessState(
     val importError: ImportError? = null,
     val importSuccessVersion: Long = 0,
     val showGameOverDialog: Boolean = false,
+    val analysisEngineStatus: AnalysisEngineStatus = AnalysisEngineStatus.HEURISTIC_FALLBACK,
 )
 
 class ChessViewModel(application: Application) : AndroidViewModel(application) {
 
     private lateinit var chessGame: IChessGame
+    private val stockfishAnalyzerProvider = StockfishAnalyzerProvider(application.applicationContext)
     private val _state = MutableStateFlow(ChessState())
     val state: StateFlow<ChessState> = _state.asStateFlow()
 
     init {
-        chessGame = ChessServiceFactory.chessService.createGame()
+        val initialGame = ChessServiceFactory.chessService.createGame()
+        val analysisEngineStatus = attachAnalyzer(initialGame)
+        chessGame = initialGame
         _state.value = rebuildStateFromGame(
-            baseState = ChessState(playerColor = PieceColor.WHITE),
-            playerColor = PieceColor.WHITE
+            baseState = ChessState(
+                playerColor = PieceColor.WHITE,
+                analysisEngineStatus = analysisEngineStatus,
+            ),
+            playerColor = PieceColor.WHITE,
+            analysisEngineStatus = analysisEngineStatus,
         )
+    }
+
+    private fun attachAnalyzer(game: IChessGame): AnalysisEngineStatus {
+        val analyzer = stockfishAnalyzerProvider.createAnalyzerOrNull()
+        game.setPositionAnalyzer(analyzer)
+        return AnalysisEngineStatusResolver.fromAnalyzerAvailable(analyzer != null)
     }
 
     private fun initPieces(): List<ChessPieceDisplay> {
@@ -142,6 +168,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         importError: ImportError? = baseState.importError,
         importSuccessVersion: Long = baseState.importSuccessVersion,
         showGameOverDialog: Boolean? = null,
+        analysisEngineStatus: AnalysisEngineStatus = baseState.analysisEngineStatus,
     ): ChessState {
         val gameState = chessGame.getGameState()
         val resolvedShowGameOverDialog = showGameOverDialog ?: if (baseState.showGameOverDialog) {
@@ -165,6 +192,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             importError = importError,
             importSuccessVersion = importSuccessVersion,
             showGameOverDialog = resolvedShowGameOverDialog,
+            analysisEngineStatus = analysisEngineStatus,
         )
     }
 
@@ -251,6 +279,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val importedGame = ChessServiceFactory.chessService.createGame()
+        val analysisEngineStatus = attachAnalyzer(importedGame)
         val success = when (format) {
             ImportFormat.FEN -> importedGame.importFEN(trimmedContent)
             ImportFormat.PGN -> importedGame.importPGN(trimmedContent)
@@ -278,6 +307,7 @@ class ChessViewModel(application: Application) : AndroidViewModel(application) {
             importError = null,
             importSuccessVersion = currentState.importSuccessVersion + 1,
             showGameOverDialog = false,
+            analysisEngineStatus = analysisEngineStatus,
         ).let { rebuiltState ->
             if (rebuiltState.gameState.isGameOver()) {
                 rebuiltState.copy(showGameOverDialog = true)

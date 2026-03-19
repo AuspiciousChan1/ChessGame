@@ -81,4 +81,6 @@
     <string name="fen_export_reason_white_rook_not_on_a1">White rook is not on a1</string>
     <string name="fen_export_reason_black_rook_not_on_h8">Black rook is not on h8</string>
     <string name="fen_export_reason_black_rook_not_on_a8">Black rook is not on a8</string>
+    <string name="analysis_engine_status_stockfish">Analysis engine: Stockfish</string>
+    <string name="analysis_engine_status_heuristic">Analysis engine: built-in heuristic fallback</string>
 </resources>

@@ -82,4 +82,6 @@
     <string name="fen_export_reason_white_rook_not_on_a1">白车不在 a1</string>
     <string name="fen_export_reason_black_rook_not_on_h8">黑车不在 h8</string>
     <string name="fen_export_reason_black_rook_not_on_a8">黑车不在 a8</string>
+    <string name="analysis_engine_status_stockfish">分析引擎：Stockfish</string>
+    <string name="analysis_engine_status_heuristic">分析引擎：内置启发式回退</string>
 </resources>

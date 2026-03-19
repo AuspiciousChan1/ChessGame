@@ -698,6 +698,14 @@ fun ChessScreen(
                         )
                     }
 
+                    AnalysisEngineStatusChip(
+                        status = state.analysisEngineStatus,
+                        modifier = Modifier
+                            .padding(top = 10.dp)
+                            .widthIn(max = squareSize)
+                            .fillMaxWidth()
+                    )
+
                     // 胡桃木风格的横向滚动工具条，预留空间
                     Box(
                         modifier = Modifier
@@ -894,5 +902,35 @@ fun ChessScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AnalysisEngineStatusChip(
+    status: AnalysisEngineStatus,
+    modifier: Modifier = Modifier,
+) {
+    val textRes = when (status) {
+        AnalysisEngineStatus.STOCKFISH -> R.string.analysis_engine_status_stockfish
+        AnalysisEngineStatus.HEURISTIC_FALLBACK -> R.string.analysis_engine_status_heuristic
+    }
+    val backgroundColor = when (status) {
+        AnalysisEngineStatus.STOCKFISH -> colorResource(R.color.walnut_light)
+        AnalysisEngineStatus.HEURISTIC_FALLBACK -> colorResource(R.color.walnut_medium)
+    }
+
+    Box(
+        modifier = modifier
+            .shadow(6.dp, RoundedCornerShape(10.dp))
+            .background(backgroundColor, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = stringResource(textRes),
+            fontSize = 13.sp,
+            color = Color.White,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }

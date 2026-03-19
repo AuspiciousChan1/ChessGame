@@ -13,3 +13,5 @@ keystore.properties
 *.jar
 *.jks
 META-INF/
+
+app/src/main/assets/stockfish
