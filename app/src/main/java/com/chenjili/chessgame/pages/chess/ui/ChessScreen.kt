@@ -718,19 +718,12 @@ fun ChessScreen(
                         )
                     }
 
-                    AnalysisEngineStatusChip(
-                        status = state.analysisEngineStatus,
-                        modifier = Modifier
-                            .padding(top = 10.dp)
-                            .widthIn(max = squareSize)
-                            .fillMaxWidth()
-                    )
-
                     AnalysisPanel(
                         analysisEnabled = state.analysisEnabled,
                         isAnalyzing = state.isAnalyzing,
                         recommendations = state.analysisRecommendations,
                         analysisMatchesCurrentPosition = state.analysisFen != null && state.analysisFen == state.positionFen,
+                        engineStatus = state.analysisEngineStatus,
                         onAnalysisEnabledChanged = { enabled ->
                             onIntent(ChessIntent.ToggleAnalysis(enabled))
                         },
@@ -946,26 +939,43 @@ private fun AnalysisPanel(
     isAnalyzing: Boolean,
     recommendations: List<AnalysisRecommendationDisplay>,
     analysisMatchesCurrentPosition: Boolean,
+    engineStatus: AnalysisEngineStatus,
     onAnalysisEnabledChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val bestMove = recommendations.firstOrNull()
     val shouldShowRecommendations = recommendations.isNotEmpty() && (analysisMatchesCurrentPosition || isAnalyzing)
+    var detailsExpanded by rememberSaveable(analysisEnabled, recommendations, isAnalyzing, analysisMatchesCurrentPosition) {
+        mutableStateOf(false)
+    }
+    val panelShape = RoundedCornerShape(12.dp)
+    val statusTextRes = when {
+        !analysisEnabled -> R.string.analysis_auto_subtitle_disabled
+        isAnalyzing && bestMove == null -> R.string.analysis_running
+        bestMove == null -> R.string.analysis_waiting_for_move
+        analysisMatchesCurrentPosition -> R.string.analysis_status_ready
+        else -> R.string.analysis_status_previous_position
+    }
+    val isChinese = Locale.getDefault().language.startsWith("zh")
+    val engineLabel = when (engineStatus) {
+        AnalysisEngineStatus.STOCKFISH -> "Stockfish"
+        AnalysisEngineStatus.HEURISTIC_FALLBACK -> if (isChinese) "启发式" else "Heuristic"
+    }
+    val detailsToggleLabel = if (detailsExpanded) {
+        if (isChinese) "收起详情" else "Hide details"
+    } else {
+        if (isChinese) "展开详情" else "Show details"
+    }
+    val canExpand = analysisEnabled && (bestMove != null || recommendations.size > 1 || isAnalyzing)
+
     Box(
         modifier = modifier
-            .shadow(10.dp, RoundedCornerShape(14.dp))
-            .background(colorResource(R.color.walnut_medium), RoundedCornerShape(14.dp))
-            .border(
-                BorderStroke(
-                    1.5.dp,
-                    if (analysisEnabled) colorResource(R.color.walnut_accent) else colorResource(R.color.walnut_dark)
-                ),
-                RoundedCornerShape(14.dp)
-            )
-            .padding(horizontal = 14.dp, vertical = 14.dp)
+            .background(colorResource(R.color.walnut_medium).copy(alpha = 0.9f), panelShape)
+            .border(BorderStroke(1.dp, colorResource(R.color.walnut_dark).copy(alpha = 0.7f)), panelShape)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -976,22 +986,35 @@ private fun AnalysisPanel(
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.analysis_auto_title),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .background(
+                                    color = if (analysisEnabled) colorResource(R.color.walnut_accent) else Color.White.copy(alpha = 0.55f),
+                                    shape = CircleShape
+                                )
+                        )
+                        Text(
+                            text = engineLabel,
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.62f),
+                        )
+                    }
                     Text(
-                        text = stringResource(R.string.analysis_auto_title),
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                    Text(
-                        text = stringResource(
-                            if (analysisEnabled) {
-                                R.string.analysis_auto_subtitle_enabled
-                            } else {
-                                R.string.analysis_auto_subtitle_disabled
-                            }
-                        ),
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.78f),
+                        text = stringResource(statusTextRes),
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.72f),
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
 
@@ -1007,68 +1030,103 @@ private fun AnalysisPanel(
                 )
             }
 
-            if (analysisEnabled) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(colorResource(R.color.walnut_grain))
+            if (analysisEnabled && bestMove != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.analysis_best_move),
+                        color = colorResource(R.color.walnut_accent),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = bestMove.notation,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = formatAnalysisScore(bestMove.scoreCp),
+                        color = colorResource(R.color.walnut_accent),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+
+            if (canExpand) {
+                Text(
+                    text = detailsToggleLabel,
+                    fontSize = 12.sp,
+                    color = colorResource(R.color.walnut_accent),
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.clickable { detailsExpanded = !detailsExpanded }
                 )
+            }
 
-                when {
-                    isAnalyzing && bestMove == null -> {
-                        Text(
-                            text = stringResource(R.string.analysis_running),
-                            color = Color.White,
-                            fontSize = 13.sp,
-                        )
-                    }
+            AnimatedVisibility(visible = detailsExpanded && analysisEnabled) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(colorResource(R.color.walnut_grain).copy(alpha = 0.6f))
+                    )
 
-                    bestMove == null -> {
-                        Text(
-                            text = stringResource(R.string.analysis_waiting_for_move),
-                            color = Color.White,
-                            fontSize = 13.sp,
-                        )
-                    }
-
-                    else -> {
-                        AnalysisSummaryBanner(
-                            bestMove = bestMove,
-                            isAnalyzing = isAnalyzing,
-                            analysisMatchesCurrentPosition = analysisMatchesCurrentPosition,
-                        )
-
-                        if (shouldShowRecommendations) {
+                    when {
+                        bestMove == null -> {
                             Text(
-                                text = stringResource(R.string.analysis_recommendations),
-                                color = colorResource(R.color.walnut_accent),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
+                                text = stringResource(statusTextRes),
+                                color = Color.White,
+                                fontSize = 12.sp,
                             )
-                            recommendations.forEachIndexed { index, recommendation ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "${index + 1}.",
-                                        color = Color.White,
-                                        modifier = Modifier.width(24.dp),
-                                        fontSize = 13.sp,
-                                    )
-                                    Text(
-                                        text = recommendation.notation,
-                                        color = Color.White,
-                                        modifier = Modifier.weight(1f),
-                                        fontSize = 13.sp,
-                                    )
-                                    Text(
-                                        text = formatAnalysisScore(recommendation.scoreCp),
-                                        color = colorResource(R.color.walnut_accent),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                    )
+                        }
+
+                        else -> {
+                            AnalysisSummaryBanner(
+                                isAnalyzing = isAnalyzing,
+                                analysisMatchesCurrentPosition = analysisMatchesCurrentPosition,
+                            )
+
+                            if (shouldShowRecommendations) {
+                                Text(
+                                    text = stringResource(R.string.analysis_recommendations),
+                                    color = colorResource(R.color.walnut_accent),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                recommendations.forEachIndexed { index, recommendation ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "${index + 1}.",
+                                            color = Color.White.copy(alpha = 0.8f),
+                                            modifier = Modifier.width(22.dp),
+                                            fontSize = 12.sp,
+                                        )
+                                        Text(
+                                            text = recommendation.notation,
+                                            color = Color.White,
+                                            modifier = Modifier.weight(1f),
+                                            fontSize = 12.sp,
+                                        )
+                                        Text(
+                                            text = formatAnalysisScore(recommendation.scoreCp),
+                                            color = colorResource(R.color.walnut_accent),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1081,7 +1139,6 @@ private fun AnalysisPanel(
 
 @Composable
 private fun AnalysisSummaryBanner(
-    bestMove: AnalysisRecommendationDisplay,
     isAnalyzing: Boolean,
     analysisMatchesCurrentPosition: Boolean,
 ) {
@@ -1095,12 +1152,12 @@ private fun AnalysisSummaryBanner(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(colorResource(R.color.walnut_light), RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .background(colorResource(R.color.walnut_light).copy(alpha = 0.92f), RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 10.dp)
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1114,35 +1171,8 @@ private fun AnalysisSummaryBanner(
                 Text(
                     text = stringResource(statusTextRes),
                     color = Color.White,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
-                )
-            }
-
-            Text(
-                text = stringResource(R.string.analysis_best_move),
-                color = colorResource(R.color.walnut_accent),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Text(
-                    text = bestMove.notation,
-                    color = Color.White,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = formatAnalysisScore(bestMove.scoreCp),
-                    color = colorResource(R.color.walnut_accent),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
                 )
             }
         }
@@ -1151,34 +1181,4 @@ private fun AnalysisSummaryBanner(
 
 private fun formatAnalysisScore(scoreCp: Int): String {
     return String.format(Locale.US, "%+.2f", scoreCp / 100f)
-}
-
-@Composable
-private fun AnalysisEngineStatusChip(
-    status: AnalysisEngineStatus,
-    modifier: Modifier = Modifier,
-) {
-    val textRes = when (status) {
-        AnalysisEngineStatus.STOCKFISH -> R.string.analysis_engine_status_stockfish
-        AnalysisEngineStatus.HEURISTIC_FALLBACK -> R.string.analysis_engine_status_heuristic
-    }
-    val backgroundColor = when (status) {
-        AnalysisEngineStatus.STOCKFISH -> colorResource(R.color.walnut_light)
-        AnalysisEngineStatus.HEURISTIC_FALLBACK -> colorResource(R.color.walnut_medium)
-    }
-
-    Box(
-        modifier = modifier
-            .shadow(6.dp, RoundedCornerShape(10.dp))
-            .background(backgroundColor, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.dp, colorResource(R.color.walnut_grain)), RoundedCornerShape(10.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = stringResource(textRes),
-            fontSize = 13.sp,
-            color = Color.White,
-            fontWeight = FontWeight.Medium,
-        )
-    }
 }
