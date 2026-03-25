@@ -1,5 +1,32 @@
+import org.gradle.api.tasks.Sync
 import java.io.FileInputStream
 import java.util.Properties
+
+val stockfishAssetRoot = layout.projectDirectory.dir("src/main/assets/stockfish")
+val filteredMainAssetsDir = layout.buildDirectory.dir("generated/mainAssets")
+val generatedStockfishJniLibsDir = layout.buildDirectory.dir("generated/stockfishJniLibs")
+
+val prepareMainAssets by tasks.registering(Sync::class) {
+    from(layout.projectDirectory.dir("src/main/assets"))
+    exclude("stockfish/**")
+    into(filteredMainAssetsDir)
+}
+
+val prepareStockfishJniLibs by tasks.registering(Sync::class) {
+    from(stockfishAssetRoot)
+    include("**/libstockfish.so")
+    exclude { !it.isDirectory && it.file.length() == 0L }
+    into(generatedStockfishJniLibsDir)
+    doLast {
+        val sourceFiles = stockfishAssetRoot.asFileTree.matching {
+            include("**/libstockfish.so")
+        }.files
+        val emptyFiles = sourceFiles.filter { it.length() == 0L }
+        if (emptyFiles.isNotEmpty()) {
+            logger.warn("Skipping empty Stockfish binaries: ${emptyFiles.joinToString { it.relativeTo(projectDir).path }}")
+        }
+    }
+}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -60,6 +87,13 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+
+    sourceSets {
+        getByName("main") {
+            assets.setSrcDirs(listOf(filteredMainAssetsDir.get().asFile))
+            jniLibs.srcDir(generatedStockfishJniLibsDir.get().asFile)
+        }
+    }
 }
 
 dependencies {
@@ -79,4 +113,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+tasks.named("preBuild") {
+    dependsOn(prepareMainAssets, prepareStockfishJniLibs)
 }
